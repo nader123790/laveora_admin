@@ -1,0 +1,37 @@
+name: laveora_admin_app
+description: "A new Flutter project."
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+# The following defines the version and build number for your application.
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.4
+
+# Dependencies specify other packages that your package needs in order to work.
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # The following adds the Cupertino Icons font to your application.
+  # Use with the CupertinoIcons class for iOS style icons.
+  cupertino_icons: ^1.0.8
+  firebase_core: ^4.6.0
+  cloud_firestore: ^6.2.0
+  intl: ^0.20.2
+  excel: ^4.0.6
+  http: ^1.6.0
+
+# Dev dependencies merged in one block ✅
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
+
+# Flutter specific settings
+flutter:
+  uses-material-design: true
+
