@@ -449,7 +449,7 @@ class _ActiveOrdersViewState extends State<ActiveOrdersView> {
                   maxCrossAxisExtent: 400,
                   mainAxisSpacing: 20,
                   crossAxisSpacing: 20,
-                  childAspectRatio: 0.72,
+                  childAspectRatio: 0.65,
                 ),
                 itemCount: customerGroups.length,
                 itemBuilder: (c, i) => OrderCustomerCard(
@@ -606,6 +606,12 @@ class _OrderCustomerCardState extends State<OrderCustomerCard> {
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  void _setOrdersReady() async {
+    for (var o in widget.orders) {
+      await o.reference.update({'status': 'جاهز'});
+    }
   }
 
   void _finalizeOrder() async {
@@ -765,29 +771,48 @@ class _OrderCustomerCardState extends State<OrderCustomerCard> {
           ),
           Padding(
             padding: const EdgeInsets.all(15),
-            child: Row(
+            child: Column(
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      for (var o in widget.orders) {
-                        if ((o.data() as Map)['status'] != "جاهز") {
-                          o.reference.update({'status': 'جاري التجهيز'});
-                        }
-                      }
-                    },
-                    child: Text(anyProcessing ? "قيد التحضير" : "تجهيز"),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          for (var o in widget.orders) {
+                            if ((o.data() as Map)['status'] != "جاهز") {
+                              o.reference.update({'status': 'جاري التجهيز'});
+                            }
+                          }
+                        },
+                        child: Text(anyProcessing ? "قيد التحضير" : "تجهيز"),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: allReady
+                              ? Colors.grey
+                              : CafeTheme.accentGreen,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: allReady ? null : _setOrdersReady,
+                        child: const Text("تم التجهيز ✅"),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: CafeTheme.accentGreen,
-                      foregroundColor: Colors.white,
+                      backgroundColor: CafeTheme.primaryGold,
+                      foregroundColor: Colors.black,
                     ),
                     onPressed: _finalizeOrder,
-                    child: const Text("تم التجهيز ✅"),
+                    icon: const Icon(Icons.receipt_long_rounded),
+                    label: const Text("تم الحساب 💰"),
                   ),
                 ),
               ],
