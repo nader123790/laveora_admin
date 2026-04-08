@@ -28844,12 +28844,12 @@ return A.O($async$aH6,r)},
 aJH(){var s=window.navigator.userAgent
 s.toString
 if(B.c.n(s,"HtmlMethod"))return
-$.aHM().wa("eval",["      (function() {\n        window.audioContext = new (window.AudioContext || window.webkitAudioContext)();\n        window.audioContext.resume();\n        var audio = new Audio('https://files.catbox.moe/qyemgh.mp3');\n        audio.volume = 0;\n        audio.play().catch(e => console.log('Unlock error:', e));\n      })();\n    "])
+$.aHM().wa("eval",["      (function() {\n        if (!window.audioObj) {\n          window.audioObj = new Audio('https://files.catbox.moe/qyemgh.mp3');\n          window.audioObj.load();\n        }\n        window.audioContext = new (window.AudioContext || window.webkitAudioContext)();\n        window.audioContext.resume();\n        \n        if ('wakeLock' in navigator) {\n          navigator.wakeLock.request('screen').catch(err => console.log('WakeLock error:', err));\n        }\n\n        var playPromise = window.audioObj.play();\n        if (playPromise !== undefined) {\n          playPromise.then(_ => {\n            window.audioObj.pause();\n            window.audioObj.currentTime = 0;\n            console.log('Audio Unlocked & Background Ready');\n          }).catch(e => console.log('Unlock error:', e));\n        }\n      })();\n    "])
 $.aJG=!0},
 aQu(){if(!$.aJG)return
-$.aHM().wa("eval",["      (function() {\n        var audio = new Audio('https://files.catbox.moe/qyemgh.mp3');\n        audio.play().catch(e => console.log('Playback error:', e));\n      })();\n    "])},
+$.aHM().wa("eval",["var audio = new Audio('https://files.catbox.moe/qyemgh.mp3'); audio.play();"])},
 b2M(){if(!$.aJG)return
-$.aHM().wa("eval",["      (function() {\n        var audio = new Audio('https://www.myinstants.com/media/sounds/ka-ching.mp3');\n        audio.play().catch(e => console.log('Playback error:', e));\n      })();\n    "])},
+$.aHM().wa("eval",["var audio = new Audio('https://www.myinstants.com/media/sounds/ka-ching.mp3'); audio.play();"])},
 Rj:function Rj(a){this.a=a},
 GV:function GV(a){this.a=a},
 a2L:function a2L(){this.c=this.a=null},
