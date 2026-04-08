@@ -3,13 +3,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'dart:async';
 import 'dart:html' as html;
+import 'dart:js' as js;
 import 'package:intl/intl.dart' as intl;
 import 'package:excel/excel.dart' hide Border;
 import 'package:http/http.dart' as http;
 
 // -------------------------------------------------------------------------
-// نظام LAVEORA | نسخة الربط النهائية بالمشروع الجديد (harafy-app)
-// تم تعديل نظام الصوت ليتوافق مع أجهزة iPhone و Safari
+// نظام LAVEORA | نسخة الإدارة - تحديث نظام الصوت للينكات السحابية
 // -------------------------------------------------------------------------
 
 void main() async {
@@ -41,31 +41,55 @@ class CafeTheme {
   static const Color accentRed = Color(0xFFE53935);
 }
 
-// محرك الصوت المحسن للأيفون
+// روابط الملفات الصوتية السحابية (Cloud Audio Links)
+class AudioLinks {
+  static const String notification = "https://files.catbox.moe/qyemgh.mp3";
+  static const String cash =
+      "https://www.myinstants.com/media/sounds/ka-ching.mp3";
+}
+
+// محرك الصوت المطور باستخدام JavaScript لضمان التشغيل على المتصفحات
 class SoundManager {
-  static final html.AudioElement _notifyAudio = html.AudioElement()
-    ..src = 'https://files.catbox.moe/83oiwo.mp3';
+  static bool isUnlocked = false;
 
-  static final html.AudioElement _cashAudio = html.AudioElement()
-    ..src = 'https://files.catbox.moe/83oiwo.mp3';
-
-  // هذه الدالة يجب استدعاؤها مرة واحدة عند أول لمسة للمستخدم (مثلاً عند تسجيل الدخول)
-  static void init() {
-    _notifyAudio.load();
-    _cashAudio.load();
-    // تشغيل وإيقاف فوري لفك قفل الصوت في Safari
-    _notifyAudio.play();
-    _notifyAudio.pause();
+  static void unlock() {
+    if (html.window.navigator.userAgent.contains('HtmlMethod')) return;
+    js.context.callMethod('eval', [
+      """
+      (function() {
+        window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        window.audioContext.resume();
+        var audio = new Audio('${AudioLinks.notification}');
+        audio.volume = 0;
+        audio.play().catch(e => console.log('Unlock error:', e));
+      })();
+    """,
+    ]);
+    isUnlocked = true;
   }
 
   static void playNotification() {
-    _notifyAudio.currentTime = 0;
-    _notifyAudio.play().catchError((e) => debugPrint("Sound Error: $e"));
+    if (!isUnlocked) return;
+    js.context.callMethod('eval', [
+      """
+      (function() {
+        var audio = new Audio('${AudioLinks.notification}');
+        audio.play().catch(e => console.log('Playback error:', e));
+      })();
+    """,
+    ]);
   }
 
   static void playCash() {
-    _cashAudio.currentTime = 0;
-    _cashAudio.play().catchError((e) => debugPrint("Sound Error: $e"));
+    if (!isUnlocked) return;
+    js.context.callMethod('eval', [
+      """
+      (function() {
+        var audio = new Audio('${AudioLinks.cash}');
+        audio.play().catch(e => console.log('Playback error:', e));
+      })();
+    """,
+    ]);
   }
 }
 
@@ -175,8 +199,8 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController passCtrl = TextEditingController();
 
   void login() async {
-    // تفعيل محرك الصوت بمجرد الضغط على الزر لفك حظر Safari
-    SoundManager.init();
+    // تفعيل محرك الصوت باستخدام الروابط السحابية عند تسجيل الدخول
+    SoundManager.unlock();
 
     var doc = await FirebaseFirestore.instance
         .collection('settings')
@@ -638,7 +662,7 @@ class _OrderCustomerCardState extends State<OrderCustomerCard> {
   }
 
   void _finalizeOrder() async {
-    SoundManager.playCash(); // استخدام نظام الصوت الجديد
+    SoundManager.playCash(); // تشغيل صوت الحساب
     for (var o in widget.orders) {
       var data = o.data() as Map<String, dynamic>;
       await FirebaseFirestore.instance.collection('sales').add({
