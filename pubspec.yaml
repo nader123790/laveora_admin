@@ -23,6 +23,7 @@ dependencies:
   intl: ^0.20.2
   excel: ^4.0.6
   http: ^1.6.0
+  audioplayers: ^5.2.1
 
 # Dev dependencies merged in one block ✅
 dev_dependencies:

@@ -7,9 +7,10 @@ import 'dart:js' as js;
 import 'package:intl/intl.dart' as intl;
 import 'package:excel/excel.dart' hide Border;
 import 'package:http/http.dart' as http;
+import 'package:audioplayers/audioplayers.dart';
 
 // -------------------------------------------------------------------------
-// نظام LAVEORA | نسخة الإدارة - التحديث النهائي للعمل في الخلفية المطلقة (Web Workers & Service Workers)
+// نظام LAVEORA | نسخة الإدارة - المنهجية المطورة للتعامل مع الصوت (AudioPlayer)
 // -------------------------------------------------------------------------
 
 void main() async {
@@ -48,79 +49,28 @@ class AudioLinks {
 }
 
 class SoundManager {
-  static bool isUnlocked = false;
+  static final AudioPlayer _player = AudioPlayer();
 
+  // تشغيل الصوت بطريقة تحافظ على الصوت حتى في الخلفية
+  static void playNotification() async {
+    try {
+      await _player.play(UrlSource(AudioLinks.notification));
+    } catch (e) {
+      debugPrint("Play notification error: $e");
+    }
+  }
+
+  static void playCash() async {
+    try {
+      await _player.play(UrlSource(AudioLinks.cash));
+    } catch (e) {
+      debugPrint("Play cash error: $e");
+    }
+  }
+
+  // دالة فارغة كما طلبت لإلغاء الـ unlock التقليدي
   static void unlock() {
-    js.context.callMethod('eval', [
-      """
-      (function() {
-        if (Notification.permission !== 'granted') {
-          Notification.requestPermission();
-        }
-
-        if (!window.audioCtx) {
-          window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          let silentSource = window.audioCtx.createBufferSource();
-          silentSource.buffer = window.audioCtx.createBuffer(1, 1, 22050);
-          silentSource.connect(window.audioCtx.destination);
-          silentSource.start();
-          
-          window.bgAudio = new Audio('${AudioLinks.notification}');
-          window.bgAudio.volume = 0.0;
-          window.bgAudio.loop = true;
-          window.bgAudio.play();
-        }
-
-        if ('wakeLock' in navigator) {
-          let wakeLock = null;
-          const requestWakeLock = async () => {
-            try {
-              wakeLock = await navigator.wakeLock.request('screen');
-              console.log('LAVEORA: Wake Lock Active');
-            } catch (err) {}
-          };
-          requestWakeLock();
-          document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') requestWakeLock();
-          });
-        }
-
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.register('flutter_service_worker.js');
-        }
-      })();
-      """,
-    ]);
-    isUnlocked = true;
-  }
-
-  static void playNotification() {
-    if (!isUnlocked) return;
-    js.context.callMethod('eval', [
-      """
-      var audio = new Audio('${AudioLinks.notification}');
-      audio.play();
-      
-      if (Notification.permission === 'granted') {
-        navigator.serviceWorker.ready.then(function(registration) {
-          registration.showNotification('LAVEORA - تنبيه جديد', {
-            body: 'هناك طلب جديد أو نداء من طاولة!',
-            icon: 'assets/logo.png',
-            vibrate: [200, 100, 200, 100, 200, 100, 200],
-            tag: 'laveora-alert',
-            renotify: true
-          });
-        });
-      }
-      """,
-    ]);
-  }
-
-  static void playCash() {
-    if (!isUnlocked) return;
-    js.context.callMethod('eval', [
-      "var audio = new Audio('${AudioLinks.cash}'); audio.play();",
-    ]);
+    // لا حاجة لهذه الدالة الآن
   }
 }
 
@@ -232,8 +182,6 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController passCtrl = TextEditingController();
 
   void login() async {
-    SoundManager.unlock();
-
     var doc = await FirebaseFirestore.instance
         .collection('settings')
         .doc('admin_pass')
@@ -324,17 +272,15 @@ class _LoginPageState extends State<LoginPage> {
                           side: const BorderSide(color: CafeTheme.primaryGold),
                         ),
                         onPressed: () {
-                          SoundManager.unlock();
+                          SoundManager.playNotification();
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text(
-                                "تم تفعيل وضع الاستيقاظ المطلق ✅ (الصوت سيعمل والجهاز مقفل)",
-                              ),
+                              content: Text("تم اختبار نظام الصوت بنجاح ✅"),
                             ),
                           );
                         },
                         icon: const Icon(Icons.volume_up_rounded),
-                        label: const Text("تفعيل وضع الاستيقاظ المطلق"),
+                        label: const Text("اختبار نظام الصوت"),
                       ),
                       const SizedBox(height: 20),
                       TextField(
@@ -450,11 +396,6 @@ class _CashierHomePageState extends State<CashierHomePage> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.volume_up, color: CafeTheme.primaryGold),
-            onPressed: () => SoundManager.unlock(),
-            tooltip: "إعادة تفعيل الصوت",
-          ),
-          IconButton(
             icon: const Icon(
               Icons.admin_panel_settings_rounded,
               color: CafeTheme.primaryGold,
@@ -538,6 +479,7 @@ class _ActiveOrdersViewState extends State<ActiveOrdersView> {
                 _lastOrderCount = snapshot.data!.docs.length;
               }
               _isFirstLoad = false;
+
               Map<String, List<QueryDocumentSnapshot>> customerGroups = {};
               if (snapshot.hasData) {
                 for (var doc in snapshot.data!.docs) {
@@ -932,7 +874,6 @@ class _OrderCustomerCardState extends State<OrderCustomerCard> {
 
 class OwnerDashboard extends StatefulWidget {
   const OwnerDashboard({super.key});
-
   @override
   State<OwnerDashboard> createState() => _OwnerDashboardState();
 }
@@ -1014,7 +955,6 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
 
   void _generateExcelReport(List<QueryDocumentSnapshot> docs) {
     if (docs.isEmpty) return;
-
     var excel = Excel.createExcel();
     excel.rename(excel.getDefaultSheet()!, 'سجل مبيعات LAVEORA');
     Sheet sheetObject = excel['سجل مبيعات LAVEORA'];
@@ -1057,10 +997,8 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
       var data = doc.data() as Map<String, dynamic>;
       DateTime dt =
           (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
-
       String dateOnly = intl.DateFormat('yyyy-MM-dd').format(dt);
       String timeOnly = intl.DateFormat('hh:mm:ss a').format(dt);
-
       String itemsStr = "";
       if (data['items'] is List) {
         itemsStr = (data['items'] as List).join(' | ');
@@ -1125,17 +1063,14 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-
         double totalSales = 0;
         int orderCount = snap.data?.docs.length ?? 0;
-
         if (snap.hasData) {
           for (var doc in snap.data!.docs) {
             var data = doc.data() as Map<String, dynamic>;
             totalSales += (data['total'] ?? 0).toDouble();
           }
         }
-
         return ListView(
           padding: const EdgeInsets.all(20),
           children: [
@@ -1727,7 +1662,6 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
 
   void _bulkDelete() async {
     if (selectedProducts.isEmpty) return;
-
     bool? confirm = await showDialog(
       context: context,
       builder: (d) => AlertDialog(
@@ -1930,7 +1864,6 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
                   'cat': selectedCat ?? "غير مصنف",
                   'has_sizes': useMultipleSizes,
                 };
-
                 if (useMultipleSizes) {
                   List<Map<String, dynamic>> sizes = [];
                   if (sizePrice1.text.isNotEmpty) {
@@ -1956,9 +1889,7 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
                 } else {
                   data['price'] = double.tryParse(prodPrice.text) ?? 0.0;
                 }
-
                 FirebaseFirestore.instance.collection('products').add(data);
-
                 prodName.clear();
                 prodPrice.clear();
                 prodImg.clear();
