@@ -283,6 +283,28 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   child: Column(
                     children: [
+                      // زر تفعيل الصوت الصريح للمتصفح
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white10,
+                          foregroundColor: CafeTheme.primaryGold,
+                          minimumSize: const Size(double.infinity, 50),
+                          side: const BorderSide(color: CafeTheme.primaryGold),
+                        ),
+                        onPressed: () {
+                          SoundManager.unlock();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                "تم تفعيل نظام التنبيهات الصوتية ✅",
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.volume_up_rounded),
+                        label: const Text("تفعيل صوت التنبيهات"),
+                      ),
+                      const SizedBox(height: 20),
                       TextField(
                         controller: passCtrl,
                         obscureText: true,
@@ -394,6 +416,11 @@ class _CashierHomePageState extends State<CashierHomePage> {
           style: TextStyle(letterSpacing: 2, fontWeight: FontWeight.bold),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.volume_up, color: CafeTheme.primaryGold),
+            onPressed: () => SoundManager.unlock(),
+            tooltip: "إعادة تفعيل الصوت",
+          ),
           IconButton(
             icon: const Icon(
               Icons.admin_panel_settings_rounded,
