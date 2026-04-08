@@ -9,12 +9,12 @@ import 'package:http/http.dart' as http;
 
 // -------------------------------------------------------------------------
 // نظام LAVEORA | نسخة الربط النهائية بالمشروع الجديد (harafy-app)
+// تم تعديل نظام الصوت ليتوافق مع أجهزة iPhone و Safari
 // -------------------------------------------------------------------------
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    // تم تحديث البيانات هنا لتطابق مشروع Firebase الجديد الخاص بك (harafy-app-f693e)
     await Firebase.initializeApp(
       options: const FirebaseOptions(
         apiKey: "AIzaSyA2FPHXlZetEjFCC9LQ-YDxr9VvTHFwa9I",
@@ -41,13 +41,33 @@ class CafeTheme {
   static const Color accentRed = Color(0xFFE53935);
 }
 
-void playNotificationSound() => html.AudioElement(
-  'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3',
-).play();
+// محرك الصوت المحسن للأيفون
+class SoundManager {
+  static final html.AudioElement _notifyAudio = html.AudioElement()
+    ..src = 'https://files.catbox.moe/83oiwo.mp3';
 
-void playCashSound() => html.AudioElement(
-  'https://www.myinstants.com/media/sounds/ka-ching.mp3',
-).play();
+  static final html.AudioElement _cashAudio = html.AudioElement()
+    ..src = 'https://files.catbox.moe/83oiwo.mp3';
+
+  // هذه الدالة يجب استدعاؤها مرة واحدة عند أول لمسة للمستخدم (مثلاً عند تسجيل الدخول)
+  static void init() {
+    _notifyAudio.load();
+    _cashAudio.load();
+    // تشغيل وإيقاف فوري لفك قفل الصوت في Safari
+    _notifyAudio.play();
+    _notifyAudio.pause();
+  }
+
+  static void playNotification() {
+    _notifyAudio.currentTime = 0;
+    _notifyAudio.play().catchError((e) => debugPrint("Sound Error: $e"));
+  }
+
+  static void playCash() {
+    _cashAudio.currentTime = 0;
+    _cashAudio.play().catchError((e) => debugPrint("Sound Error: $e"));
+  }
+}
 
 Future<void> syncToGoogleSheets(Map<String, dynamic> data) async {
   const String webHookUrl = "YOUR_GOOGLE_SCRIPT_URL_HERE";
@@ -155,6 +175,9 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController passCtrl = TextEditingController();
 
   void login() async {
+    // تفعيل محرك الصوت بمجرد الضغط على الزر لفك حظر Safari
+    SoundManager.init();
+
     var doc = await FirebaseFirestore.instance
         .collection('settings')
         .doc('admin_pass')
@@ -384,7 +407,7 @@ class _ActiveOrdersViewState extends State<ActiveOrdersView> {
             if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
               if (!_isFirstLoad &&
                   snapshot.data!.docs.length > _lastAlertCount) {
-                playNotificationSound();
+                SoundManager.playNotification();
               }
               _lastAlertCount = snapshot.data!.docs.length;
               return Container(
@@ -426,7 +449,7 @@ class _ActiveOrdersViewState extends State<ActiveOrdersView> {
               if (snapshot.hasData) {
                 if (!_isFirstLoad &&
                     snapshot.data!.docs.length > _lastOrderCount) {
-                  playNotificationSound();
+                  SoundManager.playNotification();
                 }
                 _lastOrderCount = snapshot.data!.docs.length;
               }
@@ -615,10 +638,9 @@ class _OrderCustomerCardState extends State<OrderCustomerCard> {
   }
 
   void _finalizeOrder() async {
-    playCashSound();
+    SoundManager.playCash(); // استخدام نظام الصوت الجديد
     for (var o in widget.orders) {
       var data = o.data() as Map<String, dynamic>;
-      // تسجيل الطلب في سجل المبيعات
       await FirebaseFirestore.instance.collection('sales').add({
         'customer_name': data['customer_name'],
         'table_number': data['table_number'],
@@ -628,7 +650,6 @@ class _OrderCustomerCardState extends State<OrderCustomerCard> {
         'timestamp': data['timestamp'] ?? FieldValue.serverTimestamp(),
         'note': data['note'],
       });
-      // حذف الطلب من القائمة النشطة
       await o.reference.delete();
     }
     _timer?.cancel();
@@ -1607,7 +1628,53 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
   final prodName = TextEditingController();
   final prodPrice = TextEditingController();
   final prodImg = TextEditingController();
+
+  final sizeTitle1 = TextEditingController(text: "صغير");
+  final sizePrice1 = TextEditingController();
+  final sizeTitle2 = TextEditingController(text: "وسط");
+  final sizePrice2 = TextEditingController();
+  final sizeTitle3 = TextEditingController(text: "كبير");
+  final sizePrice3 = TextEditingController();
+
   String? selectedCat;
+  bool useMultipleSizes = false;
+  Set<String> selectedProducts = {};
+
+  void _bulkDelete() async {
+    if (selectedProducts.isEmpty) return;
+
+    bool? confirm = await showDialog(
+      context: context,
+      builder: (d) => AlertDialog(
+        backgroundColor: CafeTheme.surface,
+        title: const Text("حذف جماعي"),
+        content: Text("هل أنت متأكد من حذف ${selectedProducts.length} صنف؟"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(d, false),
+            child: const Text("إلغاء"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(d, true),
+            child: const Text(
+              "تأكيد الحذف",
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      for (String id in selectedProducts) {
+        await FirebaseFirestore.instance
+            .collection('products')
+            .doc(id)
+            .delete();
+      }
+      setState(() => selectedProducts.clear());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1690,42 +1757,151 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
             decoration: const InputDecoration(hintText: "اسم الصنف"),
           ),
           TextField(
-            controller: prodPrice,
-            decoration: const InputDecoration(hintText: "السعر"),
-            keyboardType: TextInputType.number,
-          ),
-          TextField(
             controller: prodImg,
             decoration: const InputDecoration(
               hintText: "رابط الصورة (JPG/PNG)",
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 15),
+          SwitchListTile(
+            title: const Text("استخدام أحجام متعددة (مثلاً: صغير/وسط/كبير)"),
+            value: useMultipleSizes,
+            onChanged: (v) => setState(() => useMultipleSizes = v),
+            activeColor: CafeTheme.primaryGold,
+          ),
+          if (!useMultipleSizes)
+            TextField(
+              controller: prodPrice,
+              decoration: const InputDecoration(hintText: "السعر الأساسي"),
+              keyboardType: TextInputType.number,
+            )
+          else
+            Column(
+              children: [
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: sizeTitle1,
+                        decoration: const InputDecoration(labelText: "الحجم 1"),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: sizePrice1,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: "السعر"),
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: sizeTitle2,
+                        decoration: const InputDecoration(labelText: "الحجم 2"),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: sizePrice2,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: "السعر"),
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: sizeTitle3,
+                        decoration: const InputDecoration(labelText: "الحجم 3"),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: sizePrice3,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: "السعر"),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          const SizedBox(height: 20),
           ElevatedButton(
             onPressed: () {
-              if (prodName.text.isNotEmpty && prodPrice.text.isNotEmpty) {
-                FirebaseFirestore.instance.collection('products').add({
+              if (prodName.text.isNotEmpty) {
+                Map<String, dynamic> data = {
                   'name': prodName.text,
-                  'price': double.tryParse(prodPrice.text) ?? 0.0,
                   'image_url': prodImg.text,
                   'cat': selectedCat ?? "غير مصنف",
-                });
+                  'has_sizes': useMultipleSizes,
+                };
+
+                if (useMultipleSizes) {
+                  List<Map<String, dynamic>> sizes = [];
+                  if (sizePrice1.text.isNotEmpty)
+                    sizes.add({
+                      'name': sizeTitle1.text,
+                      'price': double.tryParse(sizePrice1.text) ?? 0,
+                    });
+                  if (sizePrice2.text.isNotEmpty)
+                    sizes.add({
+                      'name': sizeTitle2.text,
+                      'price': double.tryParse(sizePrice2.text) ?? 0,
+                    });
+                  if (sizePrice3.text.isNotEmpty)
+                    sizes.add({
+                      'name': sizeTitle3.text,
+                      'price': double.tryParse(sizePrice3.text) ?? 0,
+                    });
+                  data['sizes'] = sizes;
+                  data['price'] = sizes.isNotEmpty ? sizes[0]['price'] : 0.0;
+                } else {
+                  data['price'] = double.tryParse(prodPrice.text) ?? 0.0;
+                }
+
+                FirebaseFirestore.instance.collection('products').add(data);
+
                 prodName.clear();
                 prodPrice.clear();
                 prodImg.clear();
+                sizePrice1.clear();
+                sizePrice2.clear();
+                sizePrice3.clear();
               }
             },
             child: const Text("إضافة للمنيو"),
           ),
         ]),
         const SizedBox(height: 40),
-        const Text(
-          "الأصناف المضافة حالياً 📋",
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: CafeTheme.primaryGold,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              "الأصناف المضافة حالياً 📋",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: CafeTheme.primaryGold,
+              ),
+            ),
+            if (selectedProducts.isNotEmpty)
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: _bulkDelete,
+                icon: const Icon(Icons.delete_sweep),
+                label: Text("حذف المحدد (${selectedProducts.length})"),
+              ),
+          ],
         ),
         const SizedBox(height: 15),
         StreamBuilder<QuerySnapshot>(
@@ -1745,32 +1921,66 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
                     const Divider(color: Colors.white10, height: 1),
                 itemBuilder: (context, index) {
                   var item = snapshot.data!.docs[index];
+                  bool isSelected = selectedProducts.contains(item.id);
                   String imgUrl = item['image_url'] ?? "";
+                  bool hasSizes =
+                      (item.data() as Map).containsKey('has_sizes') &&
+                      item['has_sizes'] == true;
+
                   return ListTile(
-                    leading: Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        color: Colors.black26,
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: imgUrl.isNotEmpty
-                          ? Image.network(
-                              imgUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (c, e, s) => const Icon(
-                                Icons.broken_image,
-                                color: Colors.grey,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.coffee,
-                              color: CafeTheme.primaryGold,
-                            ),
+                    onTap: () {
+                      setState(() {
+                        if (isSelected) {
+                          selectedProducts.remove(item.id);
+                        } else {
+                          selectedProducts.add(item.id);
+                        }
+                      });
+                    },
+                    leading: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Checkbox(
+                          value: isSelected,
+                          onChanged: (v) {
+                            setState(() {
+                              if (v == true) {
+                                selectedProducts.add(item.id);
+                              } else {
+                                selectedProducts.remove(item.id);
+                              }
+                            });
+                          },
+                          activeColor: CafeTheme.primaryGold,
+                        ),
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            color: Colors.black26,
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: imgUrl.isNotEmpty
+                              ? Image.network(
+                                  imgUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (c, e, s) => const Icon(
+                                    Icons.broken_image,
+                                    color: Colors.grey,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.coffee,
+                                  color: CafeTheme.primaryGold,
+                                ),
+                        ),
+                      ],
                     ),
                     title: Text(item['name']),
-                    subtitle: Text("القسم: ${item['cat']}"),
+                    subtitle: Text(
+                      hasSizes ? "أحجام متعددة" : "القسم: ${item['cat']}",
+                    ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -1781,7 +1991,6 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(width: 10),
                         IconButton(
                           icon: const Icon(
                             Icons.delete,
