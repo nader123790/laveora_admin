@@ -98,7 +98,7 @@ Future<void> syncToGoogleSheets(Map<String, dynamic> data) async {
   try {
     await http.post(Uri.parse(webHookUrl), body: data);
   } catch (e) {
-    print("Google Sheets Sync Error: $e");
+    debugPrint("Google Sheets Sync Error: $e");
   }
 }
 
@@ -139,10 +139,12 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     Timer(const Duration(seconds: 4), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+        );
+      }
     });
   }
 
@@ -152,7 +154,10 @@ class _SplashScreenState extends State<SplashScreen> {
       body: Container(
         decoration: BoxDecoration(
           gradient: RadialGradient(
-            colors: [CafeTheme.primaryGold.withOpacity(0.1), CafeTheme.darkBg],
+            colors: [
+              CafeTheme.primaryGold.withValues(alpha: 0.1),
+              CafeTheme.darkBg,
+            ],
             radius: 1.2,
           ),
         ),
@@ -199,7 +204,6 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController passCtrl = TextEditingController();
 
   void login() async {
-    // تفعيل محرك الصوت باستخدام الروابط السحابية عند تسجيل الدخول
     SoundManager.unlock();
 
     var doc = await FirebaseFirestore.instance
@@ -222,6 +226,7 @@ class _LoginPageState extends State<LoginPage> {
         ),
       );
     } else {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -239,7 +244,10 @@ class _LoginPageState extends State<LoginPage> {
       body: Container(
         decoration: BoxDecoration(
           gradient: RadialGradient(
-            colors: [CafeTheme.primaryGold.withOpacity(0.1), CafeTheme.darkBg],
+            colors: [
+              CafeTheme.primaryGold.withValues(alpha: 0.1),
+              CafeTheme.darkBg,
+            ],
             radius: 1.2,
           ),
         ),
@@ -275,15 +283,16 @@ class _LoginPageState extends State<LoginPage> {
                     borderRadius: BorderRadius.circular(30),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.5),
+                        color: Colors.black.withValues(alpha: 0.5),
                         blurRadius: 40,
                       ),
                     ],
-                    border: Border.all(color: Colors.white.withOpacity(0.05)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.05),
+                    ),
                   ),
                   child: Column(
                     children: [
-                      // زر تفعيل الصوت الصريح للمتصفح
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white10,
@@ -365,6 +374,7 @@ class _CashierHomePageState extends State<CashierHomePage> {
     String correctMasterPass = (doc.exists)
         ? doc['value'].toString()
         : "LAVEORA_ADMIN";
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (c) => AlertDialog(
@@ -542,8 +552,9 @@ class _ActiveOrdersViewState extends State<ActiveOrdersView> {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('orders').snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const SizedBox.shrink();
+        }
 
         Map<String, int> summary = {};
         for (var doc in snapshot.data!.docs) {
@@ -580,7 +591,9 @@ class _ActiveOrdersViewState extends State<ActiveOrdersView> {
           decoration: BoxDecoration(
             color: CafeTheme.surface,
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: CafeTheme.primaryGold.withOpacity(0.3)),
+            border: Border.all(
+              color: CafeTheme.primaryGold.withValues(alpha: 0.3),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -610,7 +623,7 @@ class _ActiveOrdersViewState extends State<ActiveOrdersView> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.05),
+                          color: Colors.white.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: Colors.white10),
                         ),
@@ -689,7 +702,7 @@ class _OrderCustomerCardState extends State<OrderCustomerCard> {
   }
 
   void _finalizeOrder() async {
-    SoundManager.playCash(); // تشغيل صوت الحساب
+    SoundManager.playCash();
     for (var o in widget.orders) {
       var data = o.data() as Map<String, dynamic>;
       await FirebaseFirestore.instance.collection('sales').add({
@@ -732,7 +745,7 @@ class _OrderCustomerCardState extends State<OrderCustomerCard> {
           Container(
             padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.02),
+              color: Colors.white.withValues(alpha: 0.02),
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(25),
               ),
@@ -906,51 +919,22 @@ class OwnerDashboard extends StatefulWidget {
 class _OwnerDashboardState extends State<OwnerDashboard> {
   final TextEditingController rangeCtrl = TextEditingController(text: "20");
   bool _isLocating = false;
-  bool _isGlobalMode = false;
 
   @override
   void initState() {
     super.initState();
-    _loadCurrentSettings();
+    _loadCurrentRange();
   }
 
-  void _loadCurrentSettings() async {
+  void _loadCurrentRange() async {
     var doc = await FirebaseFirestore.instance
         .collection('settings')
         .doc('cafe_location')
         .get();
-    if (doc.exists && doc.data() != null) {
+    if (doc.exists && doc.data()!['allowed_range'] != null) {
       setState(() {
-        double currentRange = (doc.data()!['allowed_range'] ?? 20.0).toDouble();
-        // إذا كانت المسافة كبيرة جداً، نعتبرها وضع "عالمي"
-        _isGlobalMode = currentRange > 9000000;
-        rangeCtrl.text = _isGlobalMode ? "9999999" : currentRange.toString();
+        rangeCtrl.text = doc.data()!['allowed_range'].toString();
       });
-    }
-  }
-
-  void _toggleGlobalMode(bool val) async {
-    setState(() => _isGlobalMode = val);
-
-    // رقم ضخم جداً لتمثيل "اللا نهاية" في المدى الجغرافي
-    double rangeValue = val ? 99999999.0 : 20.0;
-
-    await FirebaseFirestore.instance
-        .collection('settings')
-        .doc('cafe_location')
-        .update({'allowed_range': rangeValue, 'is_global': val});
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            val
-                ? "تم فتح المدى للعالم أجمع 🌍"
-                : "تم إعادة المدى للنطاق المحلي 📍",
-          ),
-          backgroundColor: val ? Colors.blue : Colors.green,
-        ),
-      );
     }
   }
 
@@ -973,12 +957,11 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           .set({
             'lat': lat,
             'lon': lon,
-            'allowed_range': _isGlobalMode ? 99999999.0 : range,
-            'is_global': _isGlobalMode,
+            'allowed_range': range,
             'updated_at': FieldValue.serverTimestamp(),
           });
 
-      setState(() => _isLocating = false);
+      if (mounted) setState(() => _isLocating = false);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -987,7 +970,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         ),
       );
     } catch (e) {
-      setState(() => _isLocating = false);
+      if (mounted) setState(() => _isLocating = false);
       if (!mounted) return;
       showDialog(
         context: context,
@@ -1252,21 +1235,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          _card("إعدادات الوصول والموقع 📍", [
-            SwitchListTile(
-              title: const Text(
-                "فتح الموقع للعالم (مدى مفتوح)",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              subtitle: const Text(
-                "عند التفعيل، سيتم ضبط مدى المسافة إلى رقم ضخم جداً للسماح بالطلب من أي مكان",
-              ),
-              value: _isGlobalMode,
-              onChanged: _toggleGlobalMode,
-              activeColor: Colors.blueAccent,
-              secondary: const Icon(Icons.public, color: Colors.blueAccent),
-            ),
-            const Divider(color: Colors.white10),
+          _card("إعدادات الموقع الجغرافي 📍", [
             const Text(
               "تحديد موقع الكافية ونطاق السماح بالطلب للزبائن",
               style: TextStyle(color: Colors.white54, fontSize: 12),
@@ -1279,11 +1248,8 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                     controller: rangeCtrl,
                     keyboardType: TextInputType.number,
                     textAlign: TextAlign.center,
-                    enabled: !_isGlobalMode,
                     decoration: InputDecoration(
-                      labelText: _isGlobalMode
-                          ? "المدى حالياً: مفتوح"
-                          : "نطاق السماح (بالمتر)",
+                      labelText: "نطاق السماح (بالمتر)",
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(15),
                       ),
@@ -1334,15 +1300,15 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         color: CafeTheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: CafeTheme.primaryGold.withOpacity(0.2),
+          color: CafeTheme.primaryGold.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: const [
+          const Row(
+            children: [
               Icon(Icons.leaderboard, color: CafeTheme.accentOrange, size: 18),
               SizedBox(width: 8),
               Text(
@@ -1453,7 +1419,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         decoration: BoxDecoration(
           color: CafeTheme.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: col.withOpacity(0.3), width: 1),
+          border: Border.all(color: col.withValues(alpha: 0.3), width: 1),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1487,10 +1453,14 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
       width: 220,
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 20),
       decoration: BoxDecoration(
-        color: isDanger ? Colors.red.withOpacity(0.05) : CafeTheme.surface,
+        color: isDanger
+            ? Colors.red.withValues(alpha: 0.05)
+            : CafeTheme.surface,
         borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: isDanger ? Colors.red : CafeTheme.primaryGold.withOpacity(0.2),
+          color: isDanger
+              ? Colors.red
+              : CafeTheme.primaryGold.withValues(alpha: 0.2),
         ),
       ),
       child: Row(
@@ -1814,7 +1784,7 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
                     .map(
                       (doc) => ActionChip(
                         label: Text(doc['name']),
-                        backgroundColor: Colors.red.withOpacity(0.1),
+                        backgroundColor: Colors.red.withValues(alpha: 0.1),
                         avatar: const Icon(
                           Icons.delete_forever,
                           size: 16,
@@ -1946,21 +1916,24 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
 
                 if (useMultipleSizes) {
                   List<Map<String, dynamic>> sizes = [];
-                  if (sizePrice1.text.isNotEmpty)
+                  if (sizePrice1.text.isNotEmpty) {
                     sizes.add({
                       'name': sizeTitle1.text,
                       'price': double.tryParse(sizePrice1.text) ?? 0,
                     });
-                  if (sizePrice2.text.isNotEmpty)
+                  }
+                  if (sizePrice2.text.isNotEmpty) {
                     sizes.add({
                       'name': sizeTitle2.text,
                       'price': double.tryParse(sizePrice2.text) ?? 0,
                     });
-                  if (sizePrice3.text.isNotEmpty)
+                  }
+                  if (sizePrice3.text.isNotEmpty) {
                     sizes.add({
                       'name': sizeTitle3.text,
                       'price': double.tryParse(sizePrice3.text) ?? 0,
                     });
+                  }
                   data['sizes'] = sizes;
                   data['price'] = sizes.isNotEmpty ? sizes[0]['price'] : 0.0;
                 } else {
