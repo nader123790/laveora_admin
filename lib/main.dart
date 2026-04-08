@@ -9,7 +9,7 @@ import 'package:excel/excel.dart' hide Border;
 import 'package:http/http.dart' as http;
 
 // -------------------------------------------------------------------------
-// نظام LAVEORA | نسخة الإدارة - تحديث نظام الصوت والعمل في الخلفية
+// نظام LAVEORA | نسخة الإدارة - التحديث النهائي للعمل في الخلفية المطلقة (Web Workers & Service Workers)
 // -------------------------------------------------------------------------
 
 void main() async {
@@ -51,31 +51,45 @@ class SoundManager {
   static bool isUnlocked = false;
 
   static void unlock() {
-    if (html.window.navigator.userAgent.contains('HtmlMethod')) return;
     js.context.callMethod('eval', [
       """
       (function() {
-        if (!window.audioObj) {
-          window.audioObj = new Audio('${AudioLinks.notification}');
-          window.audioObj.load();
-        }
-        window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        window.audioContext.resume();
-        
-        if ('wakeLock' in navigator) {
-          navigator.wakeLock.request('screen').catch(err => console.log('WakeLock error:', err));
+        if (Notification.permission !== 'granted') {
+          Notification.requestPermission();
         }
 
-        var playPromise = window.audioObj.play();
-        if (playPromise !== undefined) {
-          playPromise.then(_ => {
-            window.audioObj.pause();
-            window.audioObj.currentTime = 0;
-            console.log('Audio Unlocked & Background Ready');
-          }).catch(e => console.log('Unlock error:', e));
+        if (!window.audioCtx) {
+          window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          let silentSource = window.audioCtx.createBufferSource();
+          silentSource.buffer = window.audioCtx.createBuffer(1, 1, 22050);
+          silentSource.connect(window.audioCtx.destination);
+          silentSource.start();
+          
+          window.bgAudio = new Audio('${AudioLinks.notification}');
+          window.bgAudio.volume = 0.0;
+          window.bgAudio.loop = true;
+          window.bgAudio.play();
+        }
+
+        if ('wakeLock' in navigator) {
+          let wakeLock = null;
+          const requestWakeLock = async () => {
+            try {
+              wakeLock = await navigator.wakeLock.request('screen');
+              console.log('LAVEORA: Wake Lock Active');
+            } catch (err) {}
+          };
+          requestWakeLock();
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') requestWakeLock();
+          });
+        }
+
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('flutter_service_worker.js');
         }
       })();
-    """,
+      """,
     ]);
     isUnlocked = true;
   }
@@ -83,7 +97,22 @@ class SoundManager {
   static void playNotification() {
     if (!isUnlocked) return;
     js.context.callMethod('eval', [
-      "var audio = new Audio('${AudioLinks.notification}'); audio.play();",
+      """
+      var audio = new Audio('${AudioLinks.notification}');
+      audio.play();
+      
+      if (Notification.permission === 'granted') {
+        navigator.serviceWorker.ready.then(function(registration) {
+          registration.showNotification('LAVEORA - تنبيه جديد', {
+            body: 'هناك طلب جديد أو نداء من طاولة!',
+            icon: 'assets/logo.png',
+            vibrate: [200, 100, 200, 100, 200, 100, 200],
+            tag: 'laveora-alert',
+            renotify: true
+          });
+        });
+      }
+      """,
     ]);
   }
 
@@ -156,10 +185,7 @@ class _SplashScreenState extends State<SplashScreen> {
       body: Container(
         decoration: BoxDecoration(
           gradient: RadialGradient(
-            colors: [
-              CafeTheme.primaryGold.withValues(alpha: 0.1),
-              CafeTheme.darkBg,
-            ],
+            colors: [CafeTheme.primaryGold.withOpacity(0.1), CafeTheme.darkBg],
             radius: 1.2,
           ),
         ),
@@ -246,10 +272,7 @@ class _LoginPageState extends State<LoginPage> {
       body: Container(
         decoration: BoxDecoration(
           gradient: RadialGradient(
-            colors: [
-              CafeTheme.primaryGold.withValues(alpha: 0.1),
-              CafeTheme.darkBg,
-            ],
+            colors: [CafeTheme.primaryGold.withOpacity(0.1), CafeTheme.darkBg],
             radius: 1.2,
           ),
         ),
@@ -285,13 +308,11 @@ class _LoginPageState extends State<LoginPage> {
                     borderRadius: BorderRadius.circular(30),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.5),
+                        color: Colors.black.withOpacity(0.5),
                         blurRadius: 40,
                       ),
                     ],
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.05),
-                    ),
+                    border: Border.all(color: Colors.white.withOpacity(0.05)),
                   ),
                   child: Column(
                     children: [
@@ -307,13 +328,13 @@ class _LoginPageState extends State<LoginPage> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
-                                "تم تفعيل نظام التنبيهات الصوتية ✅",
+                                "تم تفعيل وضع الاستيقاظ المطلق ✅ (الصوت سيعمل والجهاز مقفل)",
                               ),
                             ),
                           );
                         },
                         icon: const Icon(Icons.volume_up_rounded),
-                        label: const Text("تفعيل صوت التنبيهات"),
+                        label: const Text("تفعيل وضع الاستيقاظ المطلق"),
                       ),
                       const SizedBox(height: 20),
                       TextField(
@@ -593,9 +614,7 @@ class _ActiveOrdersViewState extends State<ActiveOrdersView> {
           decoration: BoxDecoration(
             color: CafeTheme.surface,
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(
-              color: CafeTheme.primaryGold.withValues(alpha: 0.3),
-            ),
+            border: Border.all(color: CafeTheme.primaryGold.withOpacity(0.3)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -625,7 +644,7 @@ class _ActiveOrdersViewState extends State<ActiveOrdersView> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.05),
+                          color: Colors.white.withOpacity(0.05),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: Colors.white10),
                         ),
@@ -747,7 +766,7 @@ class _OrderCustomerCardState extends State<OrderCustomerCard> {
           Container(
             padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.02),
+              color: Colors.white.withOpacity(0.02),
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(25),
               ),
@@ -933,9 +952,9 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         .collection('settings')
         .doc('cafe_location')
         .get();
-    if (doc.exists && doc.data()!['allowed_range'] != null) {
+    if (doc.exists && (doc.data() as Map)['allowed_range'] != null) {
       setState(() {
-        rangeCtrl.text = doc.data()!['allowed_range'].toString();
+        rangeCtrl.text = (doc.data() as Map)['allowed_range'].toString();
       });
     }
   }
@@ -1302,7 +1321,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         color: CafeTheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: CafeTheme.primaryGold.withValues(alpha: 0.2),
+          color: CafeTheme.primaryGold.withOpacity(0.2),
           width: 1,
         ),
       ),
@@ -1393,7 +1412,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
     var prods = await FirebaseFirestore.instance.collection('products').get();
     Map<String, String> itemToCat = {};
     for (var p in prods.docs) {
-      itemToCat[p['name']] = p['cat'] ?? "غير مصنف";
+      itemToCat[p['name']] = (p.data() as Map)['cat'] ?? "غير مصنف";
     }
     for (var doc in docs) {
       var data = doc.data() as Map<String, dynamic>;
@@ -1421,7 +1440,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         decoration: BoxDecoration(
           color: CafeTheme.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: col.withValues(alpha: 0.3), width: 1),
+          border: Border.all(color: col.withOpacity(0.3), width: 1),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1455,14 +1474,10 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
       width: 220,
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 20),
       decoration: BoxDecoration(
-        color: isDanger
-            ? Colors.red.withValues(alpha: 0.05)
-            : CafeTheme.surface,
+        color: isDanger ? Colors.red.withOpacity(0.05) : CafeTheme.surface,
         borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: isDanger
-              ? Colors.red
-              : CafeTheme.primaryGold.withValues(alpha: 0.2),
+          color: isDanger ? Colors.red : CafeTheme.primaryGold.withOpacity(0.2),
         ),
       ),
       child: Row(
@@ -1785,8 +1800,8 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
                 children: snap.data!.docs
                     .map(
                       (doc) => ActionChip(
-                        label: Text(doc['name']),
-                        backgroundColor: Colors.red.withValues(alpha: 0.1),
+                        label: Text((doc.data() as Map)['name']),
+                        backgroundColor: Colors.red.withOpacity(0.1),
                         avatar: const Icon(
                           Icons.delete_forever,
                           size: 16,
@@ -1813,8 +1828,8 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
                   snap.data?.docs
                       .map(
                         (d) => DropdownMenuItem(
-                          value: d['name'] as String,
-                          child: Text(d['name']),
+                          value: (d.data() as Map)['name'] as String,
+                          child: Text((d.data() as Map)['name']),
                         ),
                       )
                       .toList() ??
@@ -1994,11 +2009,12 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
                     const Divider(color: Colors.white10, height: 1),
                 itemBuilder: (context, index) {
                   var item = snapshot.data!.docs[index];
+                  var itemData = item.data() as Map;
                   bool isSelected = selectedProducts.contains(item.id);
-                  String imgUrl = item['image_url'] ?? "";
+                  String imgUrl = itemData['image_url'] ?? "";
                   bool hasSizes =
-                      (item.data() as Map).containsKey('has_sizes') &&
-                      item['has_sizes'] == true;
+                      itemData.containsKey('has_sizes') &&
+                      itemData['has_sizes'] == true;
 
                   return ListTile(
                     onTap: () {
@@ -2050,15 +2066,15 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
                         ),
                       ],
                     ),
-                    title: Text(item['name']),
+                    title: Text(itemData['name']),
                     subtitle: Text(
-                      hasSizes ? "أحجام متعددة" : "القسم: ${item['cat']}",
+                      hasSizes ? "أحجام متعددة" : "القسم: ${itemData['cat']}",
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          "${item['price']} ج.م",
+                          "${itemData['price']} ج.م",
                           style: const TextStyle(
                             color: CafeTheme.accentGreen,
                             fontWeight: FontWeight.bold,
