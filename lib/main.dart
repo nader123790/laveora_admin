@@ -906,22 +906,51 @@ class OwnerDashboard extends StatefulWidget {
 class _OwnerDashboardState extends State<OwnerDashboard> {
   final TextEditingController rangeCtrl = TextEditingController(text: "20");
   bool _isLocating = false;
+  bool _isGlobalMode = false;
 
   @override
   void initState() {
     super.initState();
-    _loadCurrentRange();
+    _loadCurrentSettings();
   }
 
-  void _loadCurrentRange() async {
+  void _loadCurrentSettings() async {
     var doc = await FirebaseFirestore.instance
         .collection('settings')
         .doc('cafe_location')
         .get();
-    if (doc.exists && doc.data()!['allowed_range'] != null) {
+    if (doc.exists && doc.data() != null) {
       setState(() {
-        rangeCtrl.text = doc.data()!['allowed_range'].toString();
+        double currentRange = (doc.data()!['allowed_range'] ?? 20.0).toDouble();
+        // إذا كانت المسافة كبيرة جداً، نعتبرها وضع "عالمي"
+        _isGlobalMode = currentRange > 9000000;
+        rangeCtrl.text = _isGlobalMode ? "9999999" : currentRange.toString();
       });
+    }
+  }
+
+  void _toggleGlobalMode(bool val) async {
+    setState(() => _isGlobalMode = val);
+
+    // رقم ضخم جداً لتمثيل "اللا نهاية" في المدى الجغرافي
+    double rangeValue = val ? 99999999.0 : 20.0;
+
+    await FirebaseFirestore.instance
+        .collection('settings')
+        .doc('cafe_location')
+        .update({'allowed_range': rangeValue, 'is_global': val});
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            val
+                ? "تم فتح المدى للعالم أجمع 🌍"
+                : "تم إعادة المدى للنطاق المحلي 📍",
+          ),
+          backgroundColor: val ? Colors.blue : Colors.green,
+        ),
+      );
     }
   }
 
@@ -944,7 +973,8 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           .set({
             'lat': lat,
             'lon': lon,
-            'allowed_range': range,
+            'allowed_range': _isGlobalMode ? 99999999.0 : range,
+            'is_global': _isGlobalMode,
             'updated_at': FieldValue.serverTimestamp(),
           });
 
@@ -1222,7 +1252,21 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          _card("إعدادات الموقع الجغرافي 📍", [
+          _card("إعدادات الوصول والموقع 📍", [
+            SwitchListTile(
+              title: const Text(
+                "فتح الموقع للعالم (مدى مفتوح)",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: const Text(
+                "عند التفعيل، سيتم ضبط مدى المسافة إلى رقم ضخم جداً للسماح بالطلب من أي مكان",
+              ),
+              value: _isGlobalMode,
+              onChanged: _toggleGlobalMode,
+              activeColor: Colors.blueAccent,
+              secondary: const Icon(Icons.public, color: Colors.blueAccent),
+            ),
+            const Divider(color: Colors.white10),
             const Text(
               "تحديد موقع الكافية ونطاق السماح بالطلب للزبائن",
               style: TextStyle(color: Colors.white54, fontSize: 12),
@@ -1235,8 +1279,11 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
                     controller: rangeCtrl,
                     keyboardType: TextInputType.number,
                     textAlign: TextAlign.center,
+                    enabled: !_isGlobalMode,
                     decoration: InputDecoration(
-                      labelText: "نطاق السماح (بالمتر)",
+                      labelText: _isGlobalMode
+                          ? "المدى حالياً: مفتوح"
+                          : "نطاق السماح (بالمتر)",
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(15),
                       ),
