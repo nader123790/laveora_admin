@@ -1,25 +1,30 @@
-name: Deploy to GitHub Pages
+name: Build and Deploy to GitHub Pages
 
 on:
   push:
     branches:
-      - main
+      - main # أو master حسب اسم الفرع عندك
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
-      - uses: subosito/flutter-action@v2
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.27.0' # الإصدار الذي يدعم withValues
           channel: 'stable'
-          
-      - run: flutter build web --release --base-href "/LAVEORA/"
-      
-      - name: Deploy
+
+      - name: Build Web
+        run: |
+          flutter pub get
+          flutter build web --release --base-href "/YOUR_REPO_NAME/"
+
+      - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./build/web
-          
