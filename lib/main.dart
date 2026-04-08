@@ -9,7 +9,7 @@ import 'package:excel/excel.dart' hide Border;
 import 'package:http/http.dart' as http;
 
 // -------------------------------------------------------------------------
-// نظام LAVEORA | نسخة الإدارة - تحديث نظام الصوت للينكات السحابية
+// نظام LAVEORA | نسخة الإدارة - تحديث نظام الصوت والعمل في الخلفية
 // -------------------------------------------------------------------------
 
 void main() async {
@@ -41,14 +41,12 @@ class CafeTheme {
   static const Color accentRed = Color(0xFFE53935);
 }
 
-// روابط الملفات الصوتية السحابية (Cloud Audio Links)
 class AudioLinks {
   static const String notification = "https://files.catbox.moe/qyemgh.mp3";
   static const String cash =
       "https://www.myinstants.com/media/sounds/ka-ching.mp3";
 }
 
-// محرك الصوت المطور باستخدام JavaScript لضمان التشغيل على المتصفحات
 class SoundManager {
   static bool isUnlocked = false;
 
@@ -57,11 +55,25 @@ class SoundManager {
     js.context.callMethod('eval', [
       """
       (function() {
+        if (!window.audioObj) {
+          window.audioObj = new Audio('${AudioLinks.notification}');
+          window.audioObj.load();
+        }
         window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
         window.audioContext.resume();
-        var audio = new Audio('${AudioLinks.notification}');
-        audio.volume = 0;
-        audio.play().catch(e => console.log('Unlock error:', e));
+        
+        if ('wakeLock' in navigator) {
+          navigator.wakeLock.request('screen').catch(err => console.log('WakeLock error:', err));
+        }
+
+        var playPromise = window.audioObj.play();
+        if (playPromise !== undefined) {
+          playPromise.then(_ => {
+            window.audioObj.pause();
+            window.audioObj.currentTime = 0;
+            console.log('Audio Unlocked & Background Ready');
+          }).catch(e => console.log('Unlock error:', e));
+        }
       })();
     """,
     ]);
@@ -71,24 +83,14 @@ class SoundManager {
   static void playNotification() {
     if (!isUnlocked) return;
     js.context.callMethod('eval', [
-      """
-      (function() {
-        var audio = new Audio('${AudioLinks.notification}');
-        audio.play().catch(e => console.log('Playback error:', e));
-      })();
-    """,
+      "var audio = new Audio('${AudioLinks.notification}'); audio.play();",
     ]);
   }
 
   static void playCash() {
     if (!isUnlocked) return;
     js.context.callMethod('eval', [
-      """
-      (function() {
-        var audio = new Audio('${AudioLinks.cash}');
-        audio.play().catch(e => console.log('Playback error:', e));
-      })();
-    """,
+      "var audio = new Audio('${AudioLinks.cash}'); audio.play();",
     ]);
   }
 }
