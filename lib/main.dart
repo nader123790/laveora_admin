@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'dart:async';
-import 'dart:io';
+import 'dart:io' show File;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:excel/excel.dart' hide Border;
@@ -15,16 +16,29 @@ import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  
+  // إعداد فايربيز مع دعم الويب
+  if (kIsWeb) {
+    await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: "YOUR_API_KEY", // يجب وضع مفاتيح الويب الخاصة بمشروعك هنا
+        authDomain: "YOUR_AUTH_DOMAIN",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_STORAGE_BUCKET",
+        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+        appId: "YOUR_APP_ID",
+      ),
+    );
+  } else {
+    await Firebase.initializeApp();
+  }
 
-  // تفعيل سجلات التصحيح (اختياري)
-  OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
-
-  // إعداد OneSignal بالـ ID الخاص بك
-  OneSignal.initialize("80e9a120-0f85-4238-add0-92fa66c3a40c");
-
-  // طلب إذن الإشعارات
-  OneSignal.Notifications.requestPermission(true);
+  // OneSignal لا يعمل مباشرة على متصفحات الويب العادية في فلوتر بنفس الطريقة
+  if (!kIsWeb) {
+    OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
+    OneSignal.initialize("80e9a120-0f85-4238-add0-92fa66c3a40c");
+    OneSignal.Notifications.requestPermission(true);
+  }
 
   runApp(const MyApp());
 }
@@ -1403,20 +1417,23 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
     }
 
     try {
-      final directory = await getApplicationDocumentsDirectory();
-      final filePath = "${directory.path}/Laveora_Sales_Report.xlsx";
-      final file = File(filePath);
-
-      final fileBytes = excel.encode();
-      await file.writeAsBytes(fileBytes!);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("تم حفظ التقرير في المستندات"),
-            backgroundColor: CafeTheme.accentGreen,
-          ),
-        );
+      if (kIsWeb) {
+        // تصدير الإكسيل على الويب
+        excel.save(fileName: "Laveora_Sales_Report.xlsx");
+      } else {
+        final directory = await getApplicationDocumentsDirectory();
+        final filePath = "${directory.path}/Laveora_Sales_Report.xlsx";
+        final file = File(filePath);
+        final fileBytes = excel.encode();
+        await file.writeAsBytes(fileBytes!);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("تم حفظ التقرير في المستندات"),
+              backgroundColor: CafeTheme.accentGreen,
+            ),
+          );
+        }
       }
     } catch (e) {
       debugPrint("Error saving excel: $e");
@@ -2023,9 +2040,9 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
         ),
         child: Column(
           children: [
-            const Text(
-              "العنوان",
-              style: TextStyle(
+            Text(
+              t,
+              style: const TextStyle(
                 color: CafeTheme.primaryGold,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
