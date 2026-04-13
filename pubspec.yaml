@@ -1,40 +1,32 @@
 name: laveora_admin_app
-description: "A new Flutter project."
-# The following line prevents the package from being accidentally published to
-# pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
-
-# The following defines the version and build number for your application.
+description: "LAVEORA Management System"
+publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.11.4
+  sdk: '>=3.0.0 <4.0.0'
 
-# Dependencies specify other packages that your package needs in order to work.
 dependencies:
   flutter:
     sdk: flutter
-
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
-  firebase_core: ^4.6.0
-  cloud_firestore: ^6.2.0
-  intl: ^0.20.2
-  excel: ^4.0.6
-  http: ^1.6.0
-  audioplayers: ^5.2.1
-
-# Dev dependencies merged in one block ✅
+  firebase_core: ^3.0.0
+  cloud_firestore: ^5.0.0
+  firebase_messaging: ^15.0.0
+  flutter_local_notifications: ^17.0.0
+  path_provider: ^2.1.0
+  intl: ^0.19.0
+  excel: ^4.0.0
+  http: ^1.2.0
+  audioplayers: ^6.0.0
+  onesignal_flutter: ^5.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
-  flutter_launcher_icons: ^0.13.1
-  peanut: ^6.0.1
-  gh_pages: ^0.1.1
+  flutter_lints: ^3.0.0
 
-# Flutter specific settings
 flutter:
   uses-material-design: true
-
+  assets:
+    - assets/logo.png
+    - assets/sounds/notification.mp3
+    - assets/sounds/cash.mp3

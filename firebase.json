@@ -1,1 +1,39 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"harafy-app-f693e","appId":"1:1040920797746:android:3c81a506782a375ef3d22b","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"harafy-app-f693e","configurations":{"android":"1:1040920797746:android:3c81a506782a375ef3d22b","ios":"1:1040920797746:ios:ea976e67c60d1eecf3d22b","macos":"1:1040920797746:ios:ea976e67c60d1eecf3d22b","web":"1:1040920797746:web:187bc3f9de94667df3d22b","windows":"1:1040920797746:web:1706406c0b0b3620f3d22b"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "harafy-app-f693e",
+          "appId": "1:1040920797746:android:3c81a506782a375ef3d22b",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "harafy-app-f693e",
+          "configurations": {
+            "android": "1:1040920797746:android:3c81a506782a375ef3d22b",
+            "ios": "1:1040920797746:ios:ea976e67c60d1eecf3d22b",
+            "macos": "1:1040920797746:ios:ea976e67c60d1eecf3d22b",
+            "web": "1:1040920797746:web:187bc3f9de94667df3d22b",
+            "windows": "1:1040920797746:web:1706406c0b0b3620f3d22b"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ]
+}
