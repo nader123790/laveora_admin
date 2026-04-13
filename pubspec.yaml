@@ -9,16 +9,31 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  
+  # المكتبات الأساسية مع ضمان التوافق مع الويب
   firebase_core: ^3.0.0
   cloud_firestore: ^5.0.0
   firebase_messaging: ^15.0.0
+  
+  # مكتبة الإشعارات المحلية (تعمل على الويب بشكل محدود ولكن لا تسبب شاشة بيضاء)
   flutter_local_notifications: ^17.0.0
+  
+  # path_provider لا تعمل على الويب، ولكن استدعاؤها في الكود يجب أن يكون مشروطاً بـ !kIsWeb
   path_provider: ^2.1.0
+  
   intl: ^0.19.0
+  
+  # مكتبة الإكسيل تدعم الويب في الإصدارات الحديثة
   excel: ^4.0.0
+  
   http: ^1.2.0
+  
+  # مكتبة الصوت تدعم الويب بشكل ممتاز
   audioplayers: ^6.0.0
+  
+  # OneSignal (يجب الحذر عند استدعائها في كود الويب واستخدام kIsWeb)
   onesignal_flutter: ^5.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -26,6 +41,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  
+  # التأكد من وجود المسارات الصحيحة للملفات
   assets:
     - assets/logo.png
     - assets/sounds/notification.mp3
