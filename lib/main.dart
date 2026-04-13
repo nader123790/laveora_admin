@@ -182,30 +182,52 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController passCtrl = TextEditingController();
 
   void login() async {
-    var doc = await FirebaseFirestore.instance
-        .collection('settings')
-        .doc('admin_pass')
-        .get();
-    String correctPass =
-        (doc.exists && doc.data() != null) ? doc['value'].toString() : "1234";
+    try {
+      var doc = await FirebaseFirestore.instance
+          .collection('settings')
+          .doc('admin_pass')
+          .get();
+      
+      String correctPass = "1234"; // القيمة الافتراضية
+      
+      if (doc.exists && doc.data() != null && doc.data()!.containsKey('value')) {
+        correctPass = doc['value'].toString();
+      } else {
+        // إذا لم يكن المستند موجوداً، نقوم بإنشائه بالقيمة الافتراضية لضمان عمل النظام مستقبلاً
+        await FirebaseFirestore.instance
+            .collection('settings')
+            .doc('admin_pass')
+            .set({'value': "1234"});
+      }
 
-    if (passCtrl.text == correctPass) {
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (c) => const Directionality(
-            textDirection: TextDirection.rtl,
-            child: CashierHomePage(),
+      if (passCtrl.text == correctPass) {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (c) => const Directionality(
+              textDirection: TextDirection.rtl,
+              child: CashierHomePage(),
+            ),
           ),
-        ),
-      );
-    } else {
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "كلمة المرور غير صحيحة، يرجى المحاولة مرة أخرى",
+              textAlign: TextAlign.center,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            "كلمة المرور غير صحيحة، يرجى المحاولة مرة أخرى",
+            "حدث خطأ في الاتصال: $e",
             textAlign: TextAlign.center,
           ),
         ),
@@ -344,7 +366,9 @@ class _CashierHomePageState extends State<CashierHomePage> {
         .doc('master_pass')
         .get();
     String correctMasterPass =
-        (doc.exists) ? doc['value'].toString() : "LAVEORA_ADMIN";
+        (doc.exists && doc.data() != null && doc.data()!.containsKey('value')) 
+        ? doc['value'].toString() 
+        : "LAVEORA_ADMIN";
 
     if (!mounted) return;
 
