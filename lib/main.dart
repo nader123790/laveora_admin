@@ -2,45 +2,34 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'dart:async';
-import 'dart:io' show File;
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:path_provider/path_provider.dart';
+import 'dart:html' as html;
+import 'dart:js' as js;
 import 'package:intl/intl.dart' as intl;
 import 'package:excel/excel.dart' hide Border;
+import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
-import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 // -------------------------------------------------------------------------
-// نظام LAVEORA | نسخة الإدارة - معالجة الأخطاء البرمجية وتحديث الأكواد القديمة
+// نظام LAVEORA | نسخة الإدارة - المنهجية المطورة للتعامل مع الصوت (AudioPlayer)
 // -------------------------------------------------------------------------
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // إعداد فايربيز مع دعم الويب
-  if (kIsWeb) {
+  try {
     await Firebase.initializeApp(
       options: const FirebaseOptions(
-        apiKey: "YOUR_API_KEY", // يجب وضع مفاتيح الويب الخاصة بمشروعك هنا
-        authDomain: "YOUR_AUTH_DOMAIN",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_STORAGE_BUCKET",
-        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-        appId: "YOUR_APP_ID",
+        apiKey: "AIzaSyA2FPHXlZetEjFCC9LQ-YDxr9VvTHFwa9I",
+        authDomain: "harafy-app-f693e.firebaseapp.com",
+        projectId: "harafy-app-f693e",
+        storageBucket: "harafy-app-f693e.appspot.com",
+        messagingSenderId: "29475261638",
+        appId: "1:29475261638:web:adc4d1cb02b21de744e2ef",
       ),
     );
-  } else {
-    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint("Firebase Init Error: $e");
   }
-
-  // OneSignal لا يعمل مباشرة على متصفحات الويب العادية في فلوتر بنفس الطريقة
-  if (!kIsWeb) {
-    OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
-    OneSignal.initialize("80e9a120-0f85-4238-add0-92fa66c3a40c");
-    OneSignal.Notifications.requestPermission(true);
-  }
-
-  runApp(const MyApp());
+  runApp(const LaveoraApp());
 }
 
 class CafeTheme {
@@ -62,9 +51,9 @@ class AudioLinks {
 class SoundManager {
   static final AudioPlayer _player = AudioPlayer();
 
+  // تشغيل الصوت بطريقة تحافظ على الصوت حتى في الخلفية
   static void playNotification() async {
     try {
-      await _player.setReleaseMode(ReleaseMode.release);
       await _player.play(UrlSource(AudioLinks.notification));
     } catch (e) {
       debugPrint("Play notification error: $e");
@@ -78,10 +67,24 @@ class SoundManager {
       debugPrint("Play cash error: $e");
     }
   }
+
+  // دالة فارغة كما طلبت لإلغاء الـ unlock التقليدي
+  static void unlock() {
+    // لا حاجة لهذه الدالة الآن
+  }
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+Future<void> syncToGoogleSheets(Map<String, dynamic> data) async {
+  const String webHookUrl = "YOUR_GOOGLE_SCRIPT_URL_HERE";
+  try {
+    await http.post(Uri.parse(webHookUrl), body: data);
+  } catch (e) {
+    debugPrint("Google Sheets Sync Error: $e");
+  }
+}
+
+class LaveoraApp extends StatelessWidget {
+  const LaveoraApp({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -132,10 +135,7 @@ class _SplashScreenState extends State<SplashScreen> {
       body: Container(
         decoration: BoxDecoration(
           gradient: RadialGradient(
-            colors: [
-              CafeTheme.primaryGold.withValues(alpha: 0.1),
-              CafeTheme.darkBg
-            ],
+            colors: [CafeTheme.primaryGold.withOpacity(0.1), CafeTheme.darkBg],
             radius: 1.2,
           ),
         ),
@@ -182,52 +182,31 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController passCtrl = TextEditingController();
 
   void login() async {
-    try {
-      var doc = await FirebaseFirestore.instance
-          .collection('settings')
-          .doc('admin_pass')
-          .get();
-      
-      String correctPass = "1234"; // القيمة الافتراضية
-      
-      if (doc.exists && doc.data() != null && doc.data()!.containsKey('value')) {
-        correctPass = doc['value'].toString();
-      } else {
-        // إذا لم يكن المستند موجوداً، نقوم بإنشائه بالقيمة الافتراضية لضمان عمل النظام مستقبلاً
-        await FirebaseFirestore.instance
-            .collection('settings')
-            .doc('admin_pass')
-            .set({'value': "1234"});
-      }
+    var doc = await FirebaseFirestore.instance
+        .collection('settings')
+        .doc('admin_pass')
+        .get();
+    String correctPass = (doc.exists && doc.data() != null)
+        ? doc['value'].toString()
+        : "1234";
 
-      if (passCtrl.text == correctPass) {
-        if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (c) => const Directionality(
-              textDirection: TextDirection.rtl,
-              child: CashierHomePage(),
-            ),
+    if (passCtrl.text == correctPass) {
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (c) => const Directionality(
+            textDirection: TextDirection.rtl,
+            child: CashierHomePage(),
           ),
-        );
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "كلمة المرور غير صحيحة، يرجى المحاولة مرة أخرى",
-              textAlign: TextAlign.center,
-            ),
-          ),
-        );
-      }
-    } catch (e) {
+        ),
+      );
+    } else {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
-            "حدث خطأ في الاتصال: $e",
+            "كلمة المرور غير صحيحة، يرجى المحاولة مرة أخرى",
             textAlign: TextAlign.center,
           ),
         ),
@@ -241,10 +220,7 @@ class _LoginPageState extends State<LoginPage> {
       body: Container(
         decoration: BoxDecoration(
           gradient: RadialGradient(
-            colors: [
-              CafeTheme.primaryGold.withValues(alpha: 0.1),
-              CafeTheme.darkBg
-            ],
+            colors: [CafeTheme.primaryGold.withOpacity(0.1), CafeTheme.darkBg],
             radius: 1.2,
           ),
         ),
@@ -280,12 +256,11 @@ class _LoginPageState extends State<LoginPage> {
                     borderRadius: BorderRadius.circular(30),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.5),
+                        color: Colors.black.withOpacity(0.5),
                         blurRadius: 40,
                       ),
                     ],
-                    border:
-                        Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                    border: Border.all(color: Colors.white.withOpacity(0.05)),
                   ),
                   child: Column(
                     children: [
@@ -365,13 +340,10 @@ class _CashierHomePageState extends State<CashierHomePage> {
         .collection('settings')
         .doc('master_pass')
         .get();
-    String correctMasterPass =
-        (doc.exists && doc.data() != null && doc.data()!.containsKey('value')) 
-        ? doc['value'].toString() 
+    String correctMasterPass = (doc.exists)
+        ? doc['value'].toString()
         : "LAVEORA_ADMIN";
-
     if (!mounted) return;
-
     showDialog(
       context: context,
       builder: (c) => AlertDialog(
@@ -451,11 +423,6 @@ class _ActiveOrdersViewState extends State<ActiveOrdersView> {
   bool _isFirstLoad = true;
 
   @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Column(
       children: [
@@ -475,14 +442,12 @@ class _ActiveOrdersViewState extends State<ActiveOrdersView> {
                   scrollDirection: Axis.horizontal,
                   children: snapshot.data!.docs.map((doc) {
                     var data = doc.data() as Map<String, dynamic>;
-                    String table = data['table_number']?.toString() ?? '؟';
-                    String customer = data['customer_name'] ?? 'مجهول';
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 5),
                       child: ActionChip(
                         backgroundColor: CafeTheme.primaryGold,
                         label: Text(
-                          "نداء: $customer | طاولة: ($table)",
+                          "نداء: ${data['customer_name'] ?? 'مجهول'} | طاولة: (${data['table_number'] ?? '?'})",
                           style: const TextStyle(
                             color: Colors.black,
                             fontWeight: FontWeight.bold,
@@ -512,23 +477,29 @@ class _ActiveOrdersViewState extends State<ActiveOrdersView> {
                   SoundManager.playNotification();
                 }
                 _lastOrderCount = snapshot.data!.docs.length;
-                _isFirstLoad = false;
               }
+              _isFirstLoad = false;
 
               Map<String, List<QueryDocumentSnapshot>> customerGroups = {};
               if (snapshot.hasData) {
                 for (var doc in snapshot.data!.docs) {
                   var data = doc.data() as Map<String, dynamic>;
-                  String cName =
-                      (data['customer_name'] ?? "عميل خارجي").toString();
+                  String cName = (data['customer_name'] ?? "عميل خارجي")
+                      .toString();
                   customerGroups.putIfAbsent(cName, () => []).add(doc);
                 }
               }
               if (customerGroups.isEmpty) {
                 return const Center(child: Text("لا توجد طلبات نشطة حالياً"));
               }
-              return ListView.builder(
-                padding: const EdgeInsets.all(10),
+              return GridView.builder(
+                padding: const EdgeInsets.all(20),
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 400,
+                  mainAxisSpacing: 20,
+                  crossAxisSpacing: 20,
+                  childAspectRatio: 0.65,
+                ),
                 itemCount: customerGroups.length,
                 itemBuilder: (c, i) => OrderCustomerCard(
                   customerName: customerGroups.keys.elementAt(i),
@@ -585,8 +556,7 @@ class _ActiveOrdersViewState extends State<ActiveOrdersView> {
           decoration: BoxDecoration(
             color: CafeTheme.surface,
             borderRadius: BorderRadius.circular(15),
-            border:
-                Border.all(color: CafeTheme.primaryGold.withValues(alpha: 0.3)),
+            border: Border.all(color: CafeTheme.primaryGold.withOpacity(0.3)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -616,7 +586,7 @@ class _ActiveOrdersViewState extends State<ActiveOrdersView> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.05),
+                          color: Colors.white.withOpacity(0.05),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: Colors.white10),
                         ),
@@ -654,7 +624,6 @@ class OrderCustomerCard extends StatefulWidget {
 class _OrderCustomerCardState extends State<OrderCustomerCard> {
   Timer? _timer;
   Duration _elapsed = Duration.zero;
-  bool _isExpanded = false;
 
   @override
   void initState() {
@@ -707,8 +676,6 @@ class _OrderCustomerCardState extends State<OrderCustomerCard> {
         'total': data['total'],
         'timestamp': data['timestamp'] ?? FieldValue.serverTimestamp(),
         'note': data['note'],
-        'phone': data['phone'],
-        'address': data['address'],
       });
       await o.reference.delete();
     }
@@ -717,141 +684,73 @@ class _OrderCustomerCardState extends State<OrderCustomerCard> {
 
   @override
   Widget build(BuildContext context) {
-    var firstOrderData = widget.orders.first.data() as Map<String, dynamic>;
     bool allReady = widget.orders.every(
       (doc) => (doc.data() as Map)['status'] == "جاهز",
     );
     bool anyProcessing = widget.orders.any(
       (doc) => (doc.data() as Map)['status'] == "جاري التجهيز",
     );
-    var tableNum = firstOrderData['table_number']?.toString() ?? "خارجي";
-    bool isExternal =
-        tableNum == "خارجي" || tableNum == "null" || tableNum.isEmpty;
+    var tableNum = (widget.orders.first.data() as Map)['table_number'] ?? "؟";
 
-    String phone = firstOrderData['phone']?.toString() ?? "";
-    String address = firstOrderData['address']?.toString() ?? "";
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      margin: const EdgeInsets.only(bottom: 12),
+    return Container(
       decoration: BoxDecoration(
         color: CafeTheme.surface,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(25),
         border: Border.all(
-          color: isExternal
-              ? Colors.blueAccent
-              : (allReady
-                  ? CafeTheme.accentGreen
-                  : (anyProcessing ? CafeTheme.accentOrange : Colors.white10)),
-          width: 1.5,
+          color: allReady
+              ? CafeTheme.accentGreen
+              : (anyProcessing ? CafeTheme.accentOrange : Colors.white10),
+          width: 2,
         ),
       ),
       child: Column(
         children: [
-          InkWell(
-            onTap: () => setState(() => _isExpanded = !_isExpanded),
-            borderRadius: BorderRadius.circular(15),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.customerName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: CafeTheme.primaryGold,
-                          ),
-                        ),
-                        Text(
-                          isExternal ? "طلب خارجي 📦" : "طاولة رقم: $tableNum",
-                          style: TextStyle(
-                            fontSize: 11,
-                            color:
-                                isExternal ? Colors.blueAccent : Colors.white54,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    "${_elapsed.inMinutes}:${(_elapsed.inSeconds % 60).toString().padLeft(2, '0')}",
-                    style: TextStyle(
-                      color: allReady ? CafeTheme.accentGreen : Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  Icon(
-                    _isExpanded
-                        ? Icons.keyboard_arrow_up
-                        : Icons.keyboard_arrow_down,
-                    color: CafeTheme.primaryGold,
-                  ),
-                ],
+          Container(
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.02),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(25),
               ),
             ),
-          ),
-          if (_isExpanded) ...[
-            const Divider(color: Colors.white10, height: 1),
-            if (isExternal && (phone.isNotEmpty || address.isNotEmpty))
-              Container(
-                width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                color: Colors.blueAccent.withValues(alpha: 0.05),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (phone.isNotEmpty)
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.phone,
-                            size: 14,
-                            color: Colors.blueAccent,
-                          ),
-                          const SizedBox(width: 5),
-                          SelectableText(
-                            phone,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.customerName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: CafeTheme.primaryGold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    if (address.isNotEmpty)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.location_on,
-                            size: 14,
-                            color: Colors.blueAccent,
-                          ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: SelectableText(
-                              address,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Text(
+                        "طاولة رقم: $tableNum",
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white54,
+                        ),
                       ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ListView(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
+                Text(
+                  "${_elapsed.inMinutes}:${(_elapsed.inSeconds % 60).toString().padLeft(2, '0')}",
+                  style: TextStyle(
+                    color: allReady ? CafeTheme.accentGreen : Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
               padding: const EdgeInsets.all(12),
               children: widget.orders.map((o) {
                 var data = o.data() as Map;
@@ -872,8 +771,9 @@ class _OrderCustomerCardState extends State<OrderCustomerCard> {
                             Icon(
                               Icons.check_circle_outline,
                               size: 16,
-                              color:
-                                  isReady ? CafeTheme.accentGreen : Colors.grey,
+                              color: isReady
+                                  ? CafeTheme.accentGreen
+                                  : Colors.grey,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -884,8 +784,9 @@ class _OrderCustomerCardState extends State<OrderCustomerCard> {
                                   decoration: isReady
                                       ? TextDecoration.lineThrough
                                       : null,
-                                  color:
-                                      isReady ? Colors.white38 : Colors.white,
+                                  color: isReady
+                                      ? Colors.white38
+                                      : Colors.white,
                                 ),
                               ),
                             ),
@@ -915,55 +816,56 @@ class _OrderCustomerCardState extends State<OrderCustomerCard> {
                 );
               }).toList(),
             ),
-            Padding(
-              padding: const EdgeInsets.all(15),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            for (var o in widget.orders) {
-                              if ((o.data() as Map)['status'] != "جاهز") {
-                                o.reference.update({'status': 'جاري التجهيز'});
-                              }
+          ),
+          Padding(
+            padding: const EdgeInsets.all(15),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          for (var o in widget.orders) {
+                            if ((o.data() as Map)['status'] != "جاهز") {
+                              o.reference.update({'status': 'جاري التجهيز'});
                             }
-                          },
-                          child: Text(anyProcessing ? "قيد التحضير" : "تجهيز"),
-                        ),
+                          }
+                        },
+                        child: Text(anyProcessing ? "قيد التحضير" : "تجهيز"),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                allReady ? Colors.grey : CafeTheme.accentGreen,
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: allReady ? null : _setOrdersReady,
-                          child: const Text("تم التجهيز ✅"),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: CafeTheme.primaryGold,
-                        foregroundColor: Colors.black,
-                      ),
-                      onPressed: _finalizeOrder,
-                      icon: const Icon(Icons.receipt_long_rounded),
-                      label: const Text("تم الحساب 💰"),
                     ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: allReady
+                              ? Colors.grey
+                              : CafeTheme.accentGreen,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: allReady ? null : _setOrdersReady,
+                        child: const Text("تم التجهيز ✅"),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: CafeTheme.primaryGold,
+                      foregroundColor: Colors.black,
+                    ),
+                    onPressed: _finalizeOrder,
+                    icon: const Icon(Icons.receipt_long_rounded),
+                    label: const Text("تم الحساب 💰"),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -977,45 +879,155 @@ class OwnerDashboard extends StatefulWidget {
 }
 
 class _OwnerDashboardState extends State<OwnerDashboard> {
-  Future<Map<String, double>> _calculateTrueSales(
-    List<QueryDocumentSnapshot> salesDocs,
-  ) async {
-    double total = 0;
-    var prodSnapshot =
-        await FirebaseFirestore.instance.collection('products').get();
-    Map<String, double> priceMap = {};
-    for (var doc in prodSnapshot.docs) {
-      priceMap[doc['name']] = (doc['price'] ?? 0).toDouble();
+  final TextEditingController rangeCtrl = TextEditingController(text: "20");
+  bool _isLocating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentRange();
+  }
+
+  void _loadCurrentRange() async {
+    var doc = await FirebaseFirestore.instance
+        .collection('settings')
+        .doc('cafe_location')
+        .get();
+    if (doc.exists && (doc.data() as Map)['allowed_range'] != null) {
+      setState(() {
+        rangeCtrl.text = (doc.data() as Map)['allowed_range'].toString();
+      });
+    }
+  }
+
+  void _setCurrentLocation(BuildContext context) async {
+    setState(() => _isLocating = true);
+    try {
+      final geolocation = html.window.navigator.geolocation;
+      final pos = await geolocation.getCurrentPosition(
+        enableHighAccuracy: true,
+        timeout: const Duration(seconds: 10),
+      );
+
+      double lat = pos.coords?.latitude?.toDouble() ?? 0.0;
+      double lon = pos.coords?.longitude?.toDouble() ?? 0.0;
+      double range = double.tryParse(rangeCtrl.text) ?? 20.0;
+
+      await FirebaseFirestore.instance
+          .collection('settings')
+          .doc('cafe_location')
+          .set({
+            'lat': lat,
+            'lon': lon,
+            'allowed_range': range,
+            'updated_at': FieldValue.serverTimestamp(),
+          });
+
+      if (mounted) setState(() => _isLocating = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("تم تثبيت الموقع بنطاق $range متر! ✅"),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (mounted) setState(() => _isLocating = false);
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (c) => AlertDialog(
+          backgroundColor: CafeTheme.surface,
+          title: const Text("فشل تحديد الموقع ❌"),
+          content: const Text(
+            "تأكد من:\n1. تفعيل الـ GPS في جهازك.\n2. إعطاء المتصفح إذن الوصول للموقع.\n3. استخدام اتصال آمن (HTTPS).",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text("فهمت"),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  void _generateExcelReport(List<QueryDocumentSnapshot> docs) {
+    if (docs.isEmpty) return;
+    var excel = Excel.createExcel();
+    excel.rename(excel.getDefaultSheet()!, 'سجل مبيعات LAVEORA');
+    Sheet sheetObject = excel['سجل مبيعات LAVEORA'];
+
+    CellStyle headerStyle = CellStyle(
+      bold: true,
+      horizontalAlign: HorizontalAlign.Center,
+      backgroundColorHex: ExcelColor.fromHexString("#C5A059"),
+      fontColorHex: ExcelColor.fromHexString("#FFFFFF"),
+    );
+
+    sheetObject.appendRow([
+      TextCellValue('التاريخ'),
+      TextCellValue('الوقت'),
+      TextCellValue('اسم العميل'),
+      TextCellValue('رقم الطاولة'),
+      TextCellValue('الأصناف والكميات'),
+      TextCellValue('الإجمالي (جنيه)'),
+    ]);
+
+    for (int i = 0; i < 6; i++) {
+      var cell = sheetObject.cell(
+        CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
+      );
+      cell.cellStyle = headerStyle;
     }
 
-    for (var doc in salesDocs) {
+    List<QueryDocumentSnapshot> sortedDocs = List.from(docs);
+    sortedDocs.sort((a, b) {
+      DateTime dtA = (a.data() as Map)['timestamp'] != null
+          ? ((a.data() as Map)['timestamp'] as Timestamp).toDate()
+          : DateTime.now();
+      DateTime dtB = (b.data() as Map)['timestamp'] != null
+          ? ((b.data() as Map)['timestamp'] as Timestamp).toDate()
+          : DateTime.now();
+      return dtB.compareTo(dtA);
+    });
+
+    for (var doc in sortedDocs) {
       var data = doc.data() as Map<String, dynamic>;
-      var items = data['items_with_qty'] ?? data['items'];
-
-      if (items is List) {
-        for (var item in items) {
-          if (item is Map) {
-            String name = item['name'] ?? "";
-            int qty = int.tryParse(item['qty'].toString()) ?? 1;
-            double price = priceMap[name] ?? 0;
-            total += (price * qty);
-          } else {
-            String raw = item.toString();
-            if (raw.contains('x')) {
-              var parts = raw.split('x');
-              int qty = int.tryParse(parts[0].trim()) ?? 1;
-              String name = parts.last.trim();
-              double price = priceMap[name] ?? 0;
-              total += (price * qty);
-            } else {
-              double price = priceMap[raw] ?? 0;
-              total += price;
-            }
-          }
-        }
+      DateTime dt =
+          (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
+      String dateOnly = intl.DateFormat('yyyy-MM-dd').format(dt);
+      String timeOnly = intl.DateFormat('hh:mm:ss a').format(dt);
+      String itemsStr = "";
+      if (data['items'] is List) {
+        itemsStr = (data['items'] as List).join(' | ');
       }
+
+      sheetObject.appendRow([
+        TextCellValue(dateOnly),
+        TextCellValue(timeOnly),
+        TextCellValue(data['customer_name']?.toString() ?? 'بيع مباشر'),
+        TextCellValue(data['table_number']?.toString() ?? '-'),
+        TextCellValue(itemsStr),
+        TextCellValue("${data['total']}"),
+      ]);
     }
-    return {'total': total};
+
+    var fileBytes = excel.encode();
+    if (fileBytes != null) {
+      final content = html.Blob([
+        fileBytes,
+      ], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      final url = html.Url.createObjectUrlFromBlob(content);
+      html.AnchorElement(href: url)
+        ..setAttribute(
+          "download",
+          "LAVEORA_REPORT_${intl.DateFormat('yyyy_MM_dd').format(DateTime.now())}.xlsx",
+        )
+        ..click();
+      html.Url.revokeObjectUrl(url);
+    }
   }
 
   @override
@@ -1032,7 +1044,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
             indicatorColor: CafeTheme.primaryGold,
             tabs: [
               Tab(text: "الإحصائيات والتحكم"),
-              Tab(text: "إدارة المنيو"),
+              Tab(text: "إدارة المنيو والموقع"),
             ],
           ),
         ),
@@ -1043,141 +1055,197 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
 
   Widget _buildStatsTab() {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('sales').snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('sales')
+          .orderBy('timestamp', descending: true)
+          .snapshots(),
       builder: (c, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-
-        List<QueryDocumentSnapshot> docs = snap.data?.docs ?? [];
-        int orderCount = docs.length;
-
-        return FutureBuilder<Map<String, double>>(
-          future: _calculateTrueSales(docs),
-          builder: (context, salesSnap) {
-            double totalSales = salesSnap.data?['total'] ?? 0;
-
-            return ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                const Text(
-                  "إحصائيات اليوم 📊",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: CafeTheme.primaryGold,
+        double totalSales = 0;
+        int orderCount = snap.data?.docs.length ?? 0;
+        if (snap.hasData) {
+          for (var doc in snap.data!.docs) {
+            var data = doc.data() as Map<String, dynamic>;
+            totalSales += (data['total'] ?? 0).toDouble();
+          }
+        }
+        return ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            const Text(
+              "إحصائيات اليوم 📊",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: CafeTheme.primaryGold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                int crossCount = constraints.maxWidth > 900
+                    ? 3
+                    : (constraints.maxWidth > 600 ? 2 : 1);
+                return GridView(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossCount,
+                    mainAxisSpacing: 15,
+                    crossAxisSpacing: 15,
+                    childAspectRatio: 1.8,
                   ),
-                ),
-                const SizedBox(height: 20),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    int crossCount = constraints.maxWidth > 900
-                        ? 3
-                        : (constraints.maxWidth > 600 ? 2 : 1);
-                    return GridView(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: crossCount,
-                        mainAxisSpacing: 15,
-                        crossAxisSpacing: 15,
-                        childAspectRatio: 1.8,
-                      ),
-                      children: [
-                        _statCard(
-                          "إجمالي المبيعات",
-                          "${totalSales.toStringAsFixed(2)} ج.م",
-                          Icons.payments,
-                          Colors.greenAccent,
-                        ),
-                        _statCard(
-                          "عدد الطلبات",
-                          "$orderCount طلب",
-                          Icons.shopping_basket,
-                          Colors.blueAccent,
-                        ),
-                        _categoryRankCard(docs),
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 40),
-                const Text(
-                  "أدوات التحكم 🛠️",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: CafeTheme.primaryGold,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Wrap(
-                  spacing: 15,
-                  runSpacing: 15,
                   children: [
-                    _adminTool(
-                      context,
-                      "تصدير سجل المبيعات (Excel)",
-                      Icons.file_download,
-                      () => _generateExcelReport(docs),
+                    _statCard(
+                      "إجمالي المبيعات",
+                      "${totalSales.toStringAsFixed(2)} ج.م",
+                      Icons.payments,
+                      Colors.greenAccent,
                     ),
-                    _adminTool(
-                      context,
-                      "تغيير باسورد الإدارة",
-                      Icons.security,
-                      () => _showChangePassDialog(
-                        context,
-                        'master_pass',
-                        'تغيير كلمة مرور المدير',
-                      ),
+                    _statCard(
+                      "عدد الطلبات",
+                      "$orderCount طلب",
+                      Icons.shopping_basket,
+                      Colors.blueAccent,
                     ),
-                    _adminTool(
-                      context,
-                      "تغيير باسورد الكاشير",
-                      Icons.vpn_key,
-                      () => _showChangePassDialog(
-                        context,
-                        'admin_pass',
-                        'تغيير كلمة مرور الدخول',
-                      ),
-                    ),
-                    _adminTool(
-                      context,
-                      "تغيير باسورد الويتر",
-                      Icons.person_outline,
-                      () => _showChangePassDialog(
-                        context,
-                        'waiter_pass',
-                        'تغيير كلمة مرور الويتر (الزبائن)',
-                      ),
-                    ),
-                    _adminTool(
-                      context,
-                      "سجل المبيعات المحلل",
-                      Icons.analytics,
-                      () => _showSalesLog(context, docs),
-                    ),
-                    _adminTool(
-                      context,
-                      "تصفير الحسابات",
-                      Icons.refresh,
-                      () => _clearSales(context),
-                      isDanger: true,
-                    ),
+                    _categoryRankCard(snap.data?.docs ?? []),
                   ],
+                );
+              },
+            ),
+            const SizedBox(height: 40),
+            const Text(
+              "أدوات التحكم 🛠️",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: CafeTheme.primaryGold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Wrap(
+              spacing: 15,
+              runSpacing: 15,
+              children: [
+                _adminTool(
+                  context,
+                  "تصدير سجل المبيعات (Excel)",
+                  Icons.file_download,
+                  () => _generateExcelReport(snap.data?.docs ?? []),
+                ),
+                _adminTool(
+                  context,
+                  "تغيير باسورد الإدارة",
+                  Icons.security,
+                  () => _showChangePassDialog(
+                    context,
+                    'master_pass',
+                    'تغيير كلمة مرور المدير',
+                  ),
+                ),
+                _adminTool(
+                  context,
+                  "تغيير باسورد الكاشير",
+                  Icons.vpn_key,
+                  () => _showChangePassDialog(
+                    context,
+                    'admin_pass',
+                    'تغيير كلمة مرور الدخول',
+                  ),
+                ),
+                _adminTool(
+                  context,
+                  "تغيير باسورد الويتر",
+                  Icons.person_outline,
+                  () => _showChangePassDialog(
+                    context,
+                    'waiter_pass',
+                    'تغيير كلمة مرور الويتر (الزبائن)',
+                  ),
+                ),
+                _adminTool(
+                  context,
+                  "سجل المبيعات المحلل",
+                  Icons.analytics,
+                  () => _showSalesLog(context, snap.data?.docs ?? []),
+                ),
+                _adminTool(
+                  context,
+                  "تصفير الحسابات",
+                  Icons.refresh,
+                  () => _clearSales(context),
+                  isDanger: true,
                 ),
               ],
-            );
-          },
+            ),
+          ],
         );
       },
     );
   }
 
   Widget _buildManagementTab() {
-    return const SingleChildScrollView(
-      padding: EdgeInsets.all(20),
-      child: Column(children: [UnifiedMenuManagement()]),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          _card("إعدادات الموقع الجغرافي 📍", [
+            const Text(
+              "تحديد موقع الكافية ونطاق السماح بالطلب للزبائن",
+              style: TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+            const SizedBox(height: 15),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: rangeCtrl,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    decoration: InputDecoration(
+                      labelText: "نطاق السماح (بالمتر)",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isLocating
+                        ? Colors.grey
+                        : CafeTheme.primaryGold,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 15,
+                    ),
+                  ),
+                  onPressed: _isLocating
+                      ? null
+                      : () => _setCurrentLocation(context),
+                  icon: _isLocating
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.black,
+                          ),
+                        )
+                      : const Icon(Icons.my_location),
+                  label: Text(_isLocating ? "جاري التحديد..." : "تثبيت الموقع"),
+                ),
+              ],
+            ),
+          ]),
+          const SizedBox(height: 20),
+          const UnifiedMenuManagement(),
+        ],
+      ),
     );
   }
 
@@ -1188,7 +1256,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         color: CafeTheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: CafeTheme.primaryGold.withValues(alpha: 0.2),
+          color: CafeTheme.primaryGold.withOpacity(0.2),
           width: 1,
         ),
       ),
@@ -1307,7 +1375,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         decoration: BoxDecoration(
           color: CafeTheme.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: col.withValues(alpha: 0.3), width: 1),
+          border: Border.all(color: col.withOpacity(0.3), width: 1),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1334,139 +1402,45 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
     IconData icon,
     VoidCallback tap, {
     bool isDanger = false,
-  }) =>
-      InkWell(
-        onTap: tap,
+  }) => InkWell(
+    onTap: tap,
+    borderRadius: BorderRadius.circular(15),
+    child: Container(
+      width: 220,
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 20),
+      decoration: BoxDecoration(
+        color: isDanger ? Colors.red.withOpacity(0.05) : CafeTheme.surface,
         borderRadius: BorderRadius.circular(15),
-        child: Container(
-          width: 220,
-          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 20),
-          decoration: BoxDecoration(
-            color: isDanger
-                ? Colors.red.withValues(alpha: 0.05)
-                : CafeTheme.surface,
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(
-              color: isDanger
-                  ? Colors.red
-                  : CafeTheme.primaryGold.withValues(alpha: 0.2),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                color: isDanger ? Colors.red : CafeTheme.primaryGold,
-                size: 24,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: isDanger ? Colors.red : Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
+        border: Border.all(
+          color: isDanger ? Colors.red : CafeTheme.primaryGold.withOpacity(0.2),
         ),
-      );
-
-  Future<void> _generateExcelReport(List<QueryDocumentSnapshot> docs) async {
-    if (docs.isEmpty) return;
-    var excel = Excel.createExcel();
-    excel.rename(excel.getDefaultSheet()!, 'سجل مبيعات LAVEORA');
-    Sheet sheetObject = excel['سجل مبيعات LAVEORA'];
-
-    CellStyle headerStyle = CellStyle(
-      bold: true,
-      horizontalAlign: HorizontalAlign.Center,
-      backgroundColorHex: ExcelColor.fromHexString("#C5A059"),
-      fontColorHex: ExcelColor.fromHexString("#FFFFFF"),
-    );
-
-    sheetObject.appendRow([
-      TextCellValue('التاريخ'),
-      TextCellValue('الوقت'),
-      TextCellValue('اسم العميل'),
-      TextCellValue('رقم الطاولة / خارجي'),
-      TextCellValue('الأصناف والكميات'),
-      TextCellValue('الإجمالي (جنيه)'),
-      TextCellValue('الهاتف'),
-      TextCellValue('العنوان'),
-    ]);
-
-    for (int i = 0; i < 8; i++) {
-      var cell = sheetObject.cell(
-        CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
-      );
-      cell.cellStyle = headerStyle;
-    }
-
-    List<QueryDocumentSnapshot> sortedDocs = List.from(docs);
-    sortedDocs.sort((a, b) {
-      DateTime dtA = (a.data() as Map)['timestamp'] != null
-          ? ((a.data() as Map)['timestamp'] as Timestamp).toDate()
-          : DateTime.now();
-      DateTime dtB = (b.data() as Map)['timestamp'] != null
-          ? ((b.data() as Map)['timestamp'] as Timestamp).toDate()
-          : DateTime.now();
-      return dtB.compareTo(dtA);
-    });
-
-    for (var doc in sortedDocs) {
-      var data = doc.data() as Map<String, dynamic>;
-      DateTime dt =
-          (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
-      String dateOnly = intl.DateFormat('yyyy-MM-dd').format(dt);
-      String timeOnly = intl.DateFormat('hh:mm:ss a').format(dt);
-      String itemsStr = "";
-      if (data['items'] is List) {
-        itemsStr = (data['items'] as List).join(' | ');
-      }
-
-      sheetObject.appendRow([
-        TextCellValue(dateOnly),
-        TextCellValue(timeOnly),
-        TextCellValue(data['customer_name']?.toString() ?? 'بيع مباشر'),
-        TextCellValue(data['table_number']?.toString() ?? 'خارجي'),
-        TextCellValue(itemsStr),
-        TextCellValue("${data['total']}"),
-        TextCellValue(data['phone']?.toString() ?? '-'),
-        TextCellValue(data['address']?.toString() ?? '-'),
-      ]);
-    }
-
-    try {
-      if (kIsWeb) {
-        // تصدير الإكسيل على الويب
-        excel.save(fileName: "Laveora_Sales_Report.xlsx");
-      } else {
-        final directory = await getApplicationDocumentsDirectory();
-        final filePath = "${directory.path}/Laveora_Sales_Report.xlsx";
-        final file = File(filePath);
-        final fileBytes = excel.encode();
-        await file.writeAsBytes(fileBytes!);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("تم حفظ التقرير في المستندات"),
-              backgroundColor: CafeTheme.accentGreen,
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: isDanger ? Colors.red : CafeTheme.primaryGold,
+            size: 24,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: isDanger ? Colors.red : Colors.white,
+              ),
             ),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint("Error saving excel: $e");
-    }
-  }
+          ),
+        ],
+      ),
+    ),
+  );
 
   void _msg(BuildContext ctx, String txt) => ScaffoldMessenger.of(
-        ctx,
-      ).showSnackBar(SnackBar(content: Text(txt, textAlign: TextAlign.center)));
+    ctx,
+  ).showSnackBar(SnackBar(content: Text(txt, textAlign: TextAlign.center)));
 
   void _showChangePassDialog(BuildContext ctx, String docId, String title) {
     final c = TextEditingController();
@@ -1534,9 +1508,7 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
         }
       }
     }
-
     if (!ctx.mounted) return;
-
     showModalBottomSheet(
       context: ctx,
       backgroundColor: CafeTheme.darkBg,
@@ -1620,8 +1592,9 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
           ),
           TextButton(
             onPressed: () async {
-              var docs =
-                  await FirebaseFirestore.instance.collection('sales').get();
+              var docs = await FirebaseFirestore.instance
+                  .collection('sales')
+                  .get();
               for (var doc in docs.docs) {
                 await doc.reference.delete();
               }
@@ -1639,6 +1612,29 @@ class _OwnerDashboardState extends State<OwnerDashboard> {
       ),
     );
   }
+
+  Widget _card(String t, List<Widget> c) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: CafeTheme.surface,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Column(
+      children: [
+        Text(
+          t,
+          style: const TextStyle(
+            color: CafeTheme.primaryGold,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 15),
+        ...c,
+      ],
+    ),
+  );
 }
 
 class UnifiedMenuManagement extends StatefulWidget {
@@ -1727,8 +1723,9 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
           ),
           const SizedBox(height: 10),
           StreamBuilder<QuerySnapshot>(
-            stream:
-                FirebaseFirestore.instance.collection('categories').snapshots(),
+            stream: FirebaseFirestore.instance
+                .collection('categories')
+                .snapshots(),
             builder: (c, snap) {
               if (!snap.hasData) return const SizedBox();
               return Wrap(
@@ -1738,7 +1735,7 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
                     .map(
                       (doc) => ActionChip(
                         label: Text((doc.data() as Map)['name']),
-                        backgroundColor: Colors.red.withValues(alpha: 0.1),
+                        backgroundColor: Colors.red.withOpacity(0.1),
                         avatar: const Icon(
                           Icons.delete_forever,
                           size: 16,
@@ -1756,11 +1753,13 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
         const SizedBox(height: 20),
         _card("إضافة صنف جديد", [
           StreamBuilder<QuerySnapshot>(
-            stream:
-                FirebaseFirestore.instance.collection('categories').snapshots(),
+            stream: FirebaseFirestore.instance
+                .collection('categories')
+                .snapshots(),
             builder: (c, snap) => DropdownButtonFormField<String>(
               hint: const Text("اختار القسم"),
-              items: snap.data?.docs
+              items:
+                  snap.data?.docs
                       .map(
                         (d) => DropdownMenuItem(
                           value: (d.data() as Map)['name'] as String,
@@ -1787,7 +1786,7 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
             title: const Text("استخدام أحجام متعددة (مثلاً: صغير/وسط/كبير)"),
             value: useMultipleSizes,
             onChanged: (v) => setState(() => useMultipleSizes = v),
-            activeThumbColor: CafeTheme.primaryGold,
+            activeColor: CafeTheme.primaryGold,
           ),
           if (!useMultipleSizes)
             TextField(
@@ -1944,7 +1943,8 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
                   var itemData = item.data() as Map;
                   bool isSelected = selectedProducts.contains(item.id);
                   String imgUrl = itemData['image_url'] ?? "";
-                  bool hasSizes = itemData.containsKey('has_sizes') &&
+                  bool hasSizes =
+                      itemData.containsKey('has_sizes') &&
                       itemData['has_sizes'] == true;
 
                   return ListTile(
@@ -2056,25 +2056,25 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
   }
 
   Widget _card(String t, List<Widget> c) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: CafeTheme.surface,
-          borderRadius: BorderRadius.circular(20),
+    width: double.infinity,
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: CafeTheme.surface,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Column(
+      children: [
+        Text(
+          t,
+          style: const TextStyle(
+            color: CafeTheme.primaryGold,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        child: Column(
-          children: [
-            Text(
-              t,
-              style: const TextStyle(
-                color: CafeTheme.primaryGold,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 15),
-            ...c,
-          ],
-        ),
-      );
+        const SizedBox(height: 15),
+        ...c,
+      ],
+    ),
+  );
 }
