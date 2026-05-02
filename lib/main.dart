@@ -1643,387 +1643,551 @@ class UnifiedMenuManagement extends StatefulWidget {
   State<UnifiedMenuManagement> createState() => _UnifiedMenuManagementState();
 }
 
-class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
-  final catCtrl = TextEditingController();
-  final prodName = TextEditingController();
-  final prodPrice = TextEditingController();
-  final prodImg = TextEditingController();
+class _UnifiedMenuManagementState extends State<UnifiedMenuManagement>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
 
-  final sizeTitle1 = TextEditingController(text: "صغير");
-  final sizePrice1 = TextEditingController();
-  final sizeTitle2 = TextEditingController(text: "وسط");
-  final sizePrice2 = TextEditingController();
-  final sizeTitle3 = TextEditingController(text: "كبير");
-  final sizePrice3 = TextEditingController();
+  final _newCatCtrl = TextEditingController();
+  final _searchCtrl = TextEditingController();
+  String _searchQuery = "";
+  String? _selectedCatFilter;
 
-  String? selectedCat;
-  bool useMultipleSizes = false;
-  Set<String> selectedProducts = {};
+  final _quickNameCtrl = TextEditingController();
+  final _quickPriceCtrl = TextEditingController();
+  String? _quickCat;
 
-  void _bulkDelete() async {
-    if (selectedProducts.isEmpty) return;
-    bool? confirm = await showDialog(
+  final _botCtrl = TextEditingController();
+
+  static const Map<String, List<Map<String, dynamic>>> _fullMenuData = {
+    "الإسبريسو": [
+      {"name": "اسبرسو سنجل", "price": 35.0},
+      {"name": "اسبرسو دبل", "price": 45.0},
+      {"name": "اسبرسو افوكادو", "price": 50.0},
+      {"name": "ماكياتو", "price": 45.0},
+      {"name": "كراميل ماكياتو", "price": 50.0},
+      {"name": "كورتادو", "price": 50.0},
+      {"name": "أمريكان كوفي", "price": 45.0},
+      {"name": "لاتيه", "price": 50.0},
+      {"name": "سبانش لاتيه", "price": 65.0},
+      {"name": "فلات وايت", "price": 55.0},
+      {"name": "كابتشينو", "price": 50.0},
+      {"name": "موكا", "price": 55.0},
+      {"name": "وايت موكا", "price": 55.0},
+      {"name": "نسكافية", "price": 45.0},
+      {"name": "نسكافية بلاك", "price": 35.0},
+      {"name": "نسكافية نكهات(كراميل-بندق-شوكلت)", "price": 50.0},
+    ],
+    "القهوة تركي": [
+      {"name": "قهوة تركي سينجل", "price": 30.0},
+      {"name": "قهوة تركي دبل", "price": 45.0},
+      {"name": "قهوة فرنساوي", "price": 35.0},
+      {"name": "قهوة نكهات", "price": 40.0},
+      {"name": "قهوة بالبندق", "price": 45.0},
+    ],
+    "المشروبات الساخنة": [
+      {"name": "شاي", "price": 15.0},
+      {"name": "شاي نكهات", "price": 20.0},
+      {"name": "شاي أخضر", "price": 20.0},
+      {"name": "شاي كرك", "price": 40.0},
+      {"name": "براد شاي", "price": 25.0},
+      {"name": "ينسون", "price": 20.0},
+      {"name": "نعناع", "price": 20.0},
+      {"name": "كركدية", "price": 20.0},
+      {"name": "قرفة", "price": 20.0},
+      {"name": "قرفة حليب", "price": 40.0},
+      {"name": "هوت سيدر", "price": 40.0},
+      {"name": "مكس اعشاب", "price": 25.0},
+      {"name": "هوت شوكلت", "price": 50.0},
+      {"name": "هوت أوريو", "price": 60.0},
+      {"name": "هوت لوتس", "price": 60.0},
+      {"name": "هوت بستاشيو", "price": 60.0},
+      {"name": "سحلب", "price": 40.0},
+      {"name": "سحلب مكسرات", "price": 50.0},
+      {"name": "سحلب فواكه", "price": 60.0},
+    ],
+    "فرابتشينو": [
+      {"name": "فرابتشينو كلاسيك", "price": 65.0},
+      {"name": "فرابتشينو(كراميل-شوكلت-وايت شوكلت-لوتس-اوريو)", "price": 65.0},
+      {"name": "فرابتشينو بيستاشيو", "price": 85.0},
+    ],
+    "العصائر الفريش": [
+      {"name": "مانجو", "price": 60.0},
+      {"name": "فراولة", "price": 60.0},
+      {"name": "موز", "price": 60.0},
+      {"name": "جوافة", "price": 60.0},
+      {"name": "ليمون - ليمون نعناع", "price": 40.0},
+      {"name": "برتقال", "price": 40.0},
+      {"name": "موز حليب", "price": 70.0},
+      {"name": "بلح", "price": 70.0},
+      {"name": "كيوي", "price": 80.0},
+      {"name": "افوكادو", "price": 85.0},
+      {"name": "كوكتيل STORM", "price": 90.0},
+      {"name": "فروت سلات", "price": 85.0},
+    ],
+    "إضافات للعصائر": [
+      {"name": "حليب", "price": 15.0},
+      {"name": "إضافة فليفر", "price": 10.0},
+      {"name": "إضافة مكسرات", "price": 20.0},
+      {"name": "نعناع اضافة", "price": 5.0},
+      {"name": "بوبا", "price": 25.0},
+    ],
+    "سموزي": [
+      {"name": "سموزي فراولة - مانجا - ليمون", "price": 65.0},
+      {
+        "name": "سموزي كيوي - اناناس - خوخ - بطيخ - باشن فروت - بلوبيري",
+        "price": 60.0,
+      },
+      {"name": "سموزي STORM", "price": 75.0},
+    ],
+    "زبادي": [
+      {"name": "زبادي عسل", "price": 65.0},
+      {"name": "زبادي عسل مكسرات", "price": 75.0},
+      {"name": "زبادي فراولة - مانجا - خوخ - بلوبيري", "price": 70.0},
+      {"name": "زبادي مكس", "price": 75.0},
+    ],
+    "ديزرت": [
+      {"name": "وافل نوتيلا - لوتس", "price": 75.0},
+      {"name": "وافل كراميل شوكليت - وايت شوكلت", "price": 75.0},
+      {"name": "وافل بستاشيو", "price": 80.0},
+      {"name": "وافل كيندر", "price": 80.0},
+      {"name": "وافل فروت", "price": 90.0},
+      {"name": "وافل ميكس", "price": 100.0},
+      {"name": "وافل STORM", "price": 110.0},
+      {"name": "ميني بان كيك نوتيلا - لوتس", "price": 60.0},
+      {"name": "ميني بان كراميل - شوكلت - وايت شوكليت", "price": 60.0},
+      {"name": "ميني بان بستاشيو", "price": 60.0},
+      {"name": "ميني بان كيندر", "price": 60.0},
+      {"name": "ميني بان فروت", "price": 70.0},
+      {"name": "ميني بان STORM", "price": 70.0},
+      {"name": "تشيز كيك", "price": 75.0},
+      {"name": "مولتن كيك", "price": 75.0},
+      {"name": "طاجن وافل حسب اختيارك", "price": 85.0},
+    ],
+    "مشروبات غازية": [
+      {"name": "مياه صغيرة", "price": 10.0},
+      {"name": "مياه كبيرة", "price": 15.0},
+      {"name": "كولا V", "price": 30.0},
+      {"name": "بيبسي / سفن / ميرندا", "price": 30.0},
+      {"name": "شويبس", "price": 30.0},
+      {"name": "فيروز", "price": 30.0},
+      {"name": "فولت / توست", "price": 35.0},
+      {"name": "ريد بول", "price": 75.0},
+    ],
+    "ميلك شيك": [
+      {"name": "ميلك شيك فانليا", "price": 75.0},
+      {"name": "ميلك شيك شوكلت", "price": 75.0},
+      {"name": "ميلك شيك كراميل", "price": 75.0},
+      {"name": "ميلك شيك أوريو", "price": 75.0},
+      {"name": "ميلك شيك لوتس", "price": 75.0},
+      {"name": "ميلك شيك نوتيلا", "price": 75.0},
+      {"name": "ميلك شيك بلوبري", "price": 75.0},
+      {"name": "ميلك شيك روزبيري", "price": 75.0},
+      {"name": "ميلك شيك ميكس بيري", "price": 75.0},
+      {"name": "ميلك شيك باشن فروت", "price": 75.0},
+      {"name": "ميلك شيك مانجا", "price": 75.0},
+      {"name": "ميلك شيك فراولة", "price": 75.0},
+      {"name": "ميلك شيك خوخ", "price": 75.0},
+      {"name": "ميلك شيك بيستاشيو", "price": 85.0},
+      {"name": "ميلك شيك سنيكرز", "price": 85.0},
+      {"name": "ميلك شيك كيندر", "price": 85.0},
+      {"name": "ميلك شيك STORM", "price": 110.0},
+    ],
+    "موهيتو": [
+      {
+        "name":
+            "موهيتو (نعناع-بلوبري-روز بيري-مكس بيري-اناناس-بطيخ-فراولة-رمان-باشن فروت-كولا-مانجا-كيوي)",
+        "price": 55.0,
+      },
+      {"name": "موهيتو ريد بول", "price": 90.0},
+      {"name": "موهيتو هامر هيد", "price": 110.0},
+      {"name": "سكاي بلو", "price": 65.0},
+      {"name": "صن شاين", "price": 65.0},
+      {"name": "صن رايز", "price": 65.0},
+      {"name": "كيوي نعناع", "price": 60.0},
+    ],
+    "أيس كوفي": [
+      {"name": "ايس لاتيه", "price": 60.0},
+      {"name": "ايس سبانيش لاتيه", "price": 70.0},
+      {"name": "ايس لاتيه كراميل", "price": 65.0},
+      {"name": "ايس لاتيه فانليا", "price": 65.0},
+      {"name": "ايس لاتيه (موكا - وايت)", "price": 65.0},
+      {"name": "ايس كراميل مكياتو", "price": 65.0},
+      {"name": "ايس امريكان كوفي", "price": 50.0},
+    ],
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _newCatCtrl.dispose();
+    _searchCtrl.dispose();
+    _quickNameCtrl.dispose();
+    _quickPriceCtrl.dispose();
+    _botCtrl.dispose();
+    super.dispose();
+  }
+
+  void _msg(String m, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(m),
+        backgroundColor: isError ? CafeTheme.accentRed : CafeTheme.accentGreen,
+      ),
+    );
+  }
+
+  void _importFullMenu() {
+    int totalItems = _fullMenuData.values.fold(0, (s, l) => s + l.length);
+    showDialog(
       context: context,
       builder: (d) => AlertDialog(
         backgroundColor: CafeTheme.surface,
-        title: const Text("حذف جماعي"),
-        content: Text("هل أنت متأكد من حذف ${selectedProducts.length} صنف؟"),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.download_rounded, color: CafeTheme.primaryGold),
+            SizedBox(width: 10),
+            Text("استيراد المنيو الكامل"),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "سيتم رفع المنيو الكامل إلى النظام:",
+              style: TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: CafeTheme.cardBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.folder_rounded,
+                        color: CafeTheme.primaryGold,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "${_fullMenuData.length} قسم",
+                        style: const TextStyle(
+                          color: CafeTheme.primaryGold,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.fastfood_rounded,
+                        color: CafeTheme.accentGreen,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "$totalItems صنف",
+                        style: const TextStyle(
+                          color: CafeTheme.accentGreen,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              "⚠️ الأقسام والأصناف الموجودة مسبقاً لن تتأثر",
+              style: TextStyle(color: CafeTheme.accentOrange, fontSize: 12),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(d, false),
-            child: const Text("إلغاء"),
+            onPressed: () => Navigator.pop(d),
+            child: const Text("إلغاء", style: TextStyle(color: Colors.white38)),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(d, true),
-            child: const Text(
-              "تأكيد الحذف",
-              style: TextStyle(color: Colors.red),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: CafeTheme.primaryGold,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () async {
+              Navigator.pop(d);
+              await _doImport();
+            },
+            icon: const Icon(Icons.rocket_launch_rounded, size: 16),
+            label: const Text(
+              "ابدأ الاستيراد",
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         ],
       ),
     );
+  }
 
-    if (confirm == true) {
-      for (String id in selectedProducts) {
-        await FirebaseFirestore.instance
-            .collection('products')
-            .doc(id)
-            .delete();
+  Future<void> _doImport() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (d) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          backgroundColor: CafeTheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: CafeTheme.primaryGold),
+              const SizedBox(height: 20),
+              const Text(
+                "جاري رفع المنيو...",
+                style: TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                "${_fullMenuData.length} قسم • ${_fullMenuData.values.fold(0, (s, l) => s + l.length)} صنف",
+                style: const TextStyle(
+                  color: CafeTheme.primaryGold,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final db = FirebaseFirestore.instance;
+      int addedCats = 0;
+      int addedProds = 0;
+
+      final existingCats = await db.collection('categories').get();
+      final existingCatNames = existingCats.docs
+          .map((d) => (d.data()['name'] ?? '').toString())
+          .toSet();
+
+      final existingProds = await db.collection('products').get();
+      final existingProdNames = existingProds.docs
+          .map((d) => (d.data()['name'] ?? '').toString().toLowerCase())
+          .toSet();
+
+      for (final entry in _fullMenuData.entries) {
+        final catName = entry.key;
+        final items = entry.value;
+
+        if (!existingCatNames.contains(catName)) {
+          await db.collection('categories').add({'name': catName});
+          addedCats++;
+        }
+
+        for (final item in items) {
+          final itemNameLower = (item['name'] as String).toLowerCase();
+          if (!existingProdNames.contains(itemNameLower)) {
+            await db.collection('products').add({
+              'name': item['name'],
+              'price': item['price'],
+              'cat': catName,
+              'image_url': '',
+              'has_sizes': false,
+            });
+            addedProds++;
+          }
+        }
       }
-      setState(() => selectedProducts.clear());
+
+      if (mounted) Navigator.pop(context);
+
+      if (mounted) {
+        int skipped =
+            (_fullMenuData.length - addedCats) +
+            (_fullMenuData.values.fold(0, (s, l) => s + l.length) - addedProds);
+        showDialog(
+          context: context,
+          builder: (d) => AlertDialog(
+            backgroundColor: CafeTheme.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: CafeTheme.accentGreen),
+                SizedBox(width: 10),
+                Text("تم الاستيراد بنجاح! 🎉"),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _resultRow("أقسام أُضيفت", "$addedCats", CafeTheme.primaryGold),
+                const SizedBox(height: 8),
+                _resultRow(
+                  "أصناف أُضيفت",
+                  "$addedProds",
+                  CafeTheme.accentGreen,
+                ),
+                const SizedBox(height: 8),
+                _resultRow("تم تخطيه (موجود)", "$skipped", Colors.white38),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: CafeTheme.primaryGold,
+                ),
+                onPressed: () => Navigator.pop(d),
+                child: const Text(
+                  "ممتاز!",
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      if (mounted) _msg("حدث خطأ أثناء الاستيراد: $e", isError: true);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _resultRow(String label, String value, Color color) => Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(label, style: const TextStyle(color: Colors.white70)),
+      Text(
+        value,
+        style: TextStyle(color: color, fontWeight: FontWeight.bold),
+      ),
+    ],
+  );
+
+  Widget _buildCategoriesTab() {
     return Column(
       children: [
-        _card("إدارة الأقسام", [
-          TextField(
-            controller: catCtrl,
-            decoration: const InputDecoration(hintText: "اسم القسم الجديد"),
-          ),
-          const SizedBox(height: 10),
-          ElevatedButton(
-            onPressed: () {
-              if (catCtrl.text.isNotEmpty) {
-                FirebaseFirestore.instance.collection('categories').add({
-                  'name': catCtrl.text,
-                });
-                catCtrl.clear();
-              }
-            },
-            child: const Text("إضافة قسم"),
-          ),
-          const Divider(height: 30),
-          const Text(
-            "الأقسام الحالية (اضغط للحذف):",
-            style: TextStyle(fontSize: 14, color: Colors.white54),
-          ),
-          const SizedBox(height: 10),
-          StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('categories')
-                .snapshots(),
-            builder: (c, snap) {
-              if (!snap.hasData) return const SizedBox();
-              return Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: snap.data!.docs
-                    .map(
-                      (doc) => ActionChip(
-                        label: Text((doc.data() as Map)['name']),
-                        backgroundColor: Colors.red.withOpacity(0.1),
-                        avatar: const Icon(
-                          Icons.delete_forever,
-                          size: 16,
-                          color: Colors.red,
-                        ),
-                        onPressed: () =>
-                            _confirmDelete(context, "القسم", doc.reference),
-                      ),
-                    )
-                    .toList(),
-              );
-            },
-          ),
-        ]),
-        const SizedBox(height: 20),
-        _card("إضافة صنف جديد", [
-          StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('categories')
-                .snapshots(),
-            builder: (c, snap) => DropdownButtonFormField<String>(
-              hint: const Text("اختار القسم"),
-              items:
-                  snap.data?.docs
-                      .map(
-                        (d) => DropdownMenuItem(
-                          value: (d.data() as Map)['name'] as String,
-                          child: Text((d.data() as Map)['name']),
-                        ),
-                      )
-                      .toList() ??
-                  [],
-              onChanged: (v) => selectedCat = v,
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _importFullMenu,
+            icon: const Icon(Icons.download_rounded, size: 20),
+            label: const Text(
+              "استيراد المنيو الكامل (122 صنف / 13 قسم)",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
-          ),
-          TextField(
-            controller: prodName,
-            decoration: const InputDecoration(hintText: "اسم الصنف"),
-          ),
-          TextField(
-            controller: prodImg,
-            decoration: const InputDecoration(
-              hintText: "رابط الصورة (JPG/PNG)",
-            ),
-          ),
-          const SizedBox(height: 15),
-          SwitchListTile(
-            title: const Text("استخدام أحجام متعددة (مثلاً: صغير/وسط/كبير)"),
-            value: useMultipleSizes,
-            onChanged: (v) => setState(() => useMultipleSizes = v),
-            activeColor: CafeTheme.primaryGold,
-          ),
-          if (!useMultipleSizes)
-            TextField(
-              controller: prodPrice,
-              decoration: const InputDecoration(hintText: "السعر الأساسي"),
-              keyboardType: TextInputType.number,
-            )
-          else
-            Column(
-              children: [
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: sizeTitle1,
-                        decoration: const InputDecoration(labelText: "الحجم 1"),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: sizePrice1,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: "السعر"),
-                      ),
-                    ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: sizeTitle2,
-                        decoration: const InputDecoration(labelText: "الحجم 2"),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: sizePrice2,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: "السعر"),
-                      ),
-                    ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: sizeTitle3,
-                        decoration: const InputDecoration(labelText: "الحجم 3"),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: sizePrice3,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: "السعر"),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: () {
-              if (prodName.text.isNotEmpty) {
-                Map<String, dynamic> data = {
-                  'name': prodName.text,
-                  'image_url': prodImg.text,
-                  'cat': selectedCat ?? "غير مصنف",
-                  'has_sizes': useMultipleSizes,
-                };
-                if (useMultipleSizes) {
-                  List<Map<String, dynamic>> sizes = [];
-                  if (sizePrice1.text.isNotEmpty) {
-                    sizes.add({
-                      'name': sizeTitle1.text,
-                      'price': double.tryParse(sizePrice1.text) ?? 0,
-                    });
-                  }
-                  if (sizePrice2.text.isNotEmpty) {
-                    sizes.add({
-                      'name': sizeTitle2.text,
-                      'price': double.tryParse(sizePrice2.text) ?? 0,
-                    });
-                  }
-                  if (sizePrice3.text.isNotEmpty) {
-                    sizes.add({
-                      'name': sizeTitle3.text,
-                      'price': double.tryParse(sizePrice3.text) ?? 0,
-                    });
-                  }
-                  data['sizes'] = sizes;
-                  data['price'] = sizes.isNotEmpty ? sizes[0]['price'] : 0.0;
-                } else {
-                  data['price'] = double.tryParse(prodPrice.text) ?? 0.0;
-                }
-                FirebaseFirestore.instance.collection('products').add(data);
-                prodName.clear();
-                prodPrice.clear();
-                prodImg.clear();
-                sizePrice1.clear();
-                sizePrice2.clear();
-                sizePrice3.clear();
-              }
-            },
-            child: const Text("إضافة للمنيو"),
-          ),
-        ]),
-        const SizedBox(height: 40),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              "الأصناف المضافة حالياً 📋",
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: CafeTheme.primaryGold,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: CafeTheme.primaryGold,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
               ),
+              elevation: 4,
             ),
-            if (selectedProducts.isNotEmpty)
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                onPressed: _bulkDelete,
-                icon: const Icon(Icons.delete_sweep),
-                label: Text("حذف المحدد (${selectedProducts.length})"),
-              ),
-          ],
+          ),
         ),
-        const SizedBox(height: 15),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: CafeTheme.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: CafeTheme.primaryGold.withValues(alpha: 0.4),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.add_circle_outline,
+                color: CafeTheme.primaryGold,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: _newCatCtrl,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    hintText: "اسم القسم الجديد...",
+                    hintStyle: TextStyle(color: Colors.white38),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  onSubmitted: (_) => _addCategory(),
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: _addCategory,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text("إضافة"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: CafeTheme.primaryGold,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
         StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance.collection('products').snapshots(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) return const CircularProgressIndicator();
-            return Container(
-              decoration: BoxDecoration(
-                color: CafeTheme.surface,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: snapshot.data!.docs.length,
-                separatorBuilder: (c, i) =>
-                    const Divider(color: Colors.white10, height: 1),
-                itemBuilder: (context, index) {
-                  var item = snapshot.data!.docs[index];
-                  var itemData = item.data() as Map;
-                  bool isSelected = selectedProducts.contains(item.id);
-                  String imgUrl = itemData['image_url'] ?? "";
-                  bool hasSizes =
-                      itemData.containsKey('has_sizes') &&
-                      itemData['has_sizes'] == true;
-
-                  return ListTile(
-                    onTap: () {
-                      setState(() {
-                        if (isSelected) {
-                          selectedProducts.remove(item.id);
-                        } else {
-                          selectedProducts.add(item.id);
-                        }
-                      });
-                    },
-                    leading: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Checkbox(
-                          value: isSelected,
-                          onChanged: (v) {
-                            setState(() {
-                              if (v == true) {
-                                selectedProducts.add(item.id);
-                              } else {
-                                selectedProducts.remove(item.id);
-                              }
-                            });
-                          },
-                          activeColor: CafeTheme.primaryGold,
-                        ),
-                        Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            color: Colors.black26,
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: imgUrl.isNotEmpty
-                              ? Image.network(
-                                  imgUrl,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (c, e, s) => const Icon(
-                                    Icons.broken_image,
-                                    color: Colors.grey,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.coffee,
-                                  color: CafeTheme.primaryGold,
-                                ),
-                        ),
-                      ],
-                    ),
-                    title: Text(itemData['name']),
-                    subtitle: Text(
-                      hasSizes ? "أحجام متعددة" : "القسم: ${itemData['cat']}",
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          "${itemData['price']} ج.م",
-                          style: const TextStyle(
-                            color: CafeTheme.accentGreen,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.delete,
-                            color: Colors.redAccent,
-                          ),
-                          onPressed: () =>
-                              _confirmDelete(context, "الصنف", item.reference),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+          stream: FirebaseFirestore.instance
+              .collection('categories')
+              .snapshots(),
+          builder: (ctx, snap) {
+            if (!snap.hasData) {
+              return const Center(
+                child: CircularProgressIndicator(color: CafeTheme.primaryGold),
+              );
+            }
+            final docs = snap.data!.docs;
+            if (docs.isEmpty) {
+              return _emptyState(
+                Icons.category_outlined,
+                "لا توجد أقسام بعد\nاضغط الزرار الذهبي لاستيراد المنيو كاملاً!",
+              );
+            }
+            return ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: docs.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (ctx, i) => _categoryCard(docs[i]),
             );
           },
         ),
@@ -2031,50 +2195,967 @@ class _UnifiedMenuManagementState extends State<UnifiedMenuManagement> {
     );
   }
 
-  void _confirmDelete(BuildContext ctx, String type, DocumentReference ref) {
+  Widget _categoryCard(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    final name = data['name']?.toString() ?? "قسم";
+
+    return Container(
+      decoration: BoxDecoration(
+        color: CafeTheme.cardBg,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: ListTile(
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: CafeTheme.primaryGold.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Icon(
+            Icons.folder_rounded,
+            color: CafeTheme.primaryGold,
+            size: 20,
+          ),
+        ),
+        title: Text(
+          name,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('products')
+              .where('cat', isEqualTo: name)
+              .snapshots(),
+          builder: (_, s) {
+            int count = s.data?.docs.length ?? 0;
+            return Text(
+              "$count صنف",
+              style: const TextStyle(color: Colors.white38, fontSize: 12),
+            );
+          },
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _iconBtn(
+              Icons.edit_rounded,
+              Colors.blueAccent,
+              () => _editCategory(doc),
+            ),
+            const SizedBox(width: 4),
+            _iconBtn(
+              Icons.delete_rounded,
+              CafeTheme.accentRed,
+              () => _confirmDeleteCategory(doc, name),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _addCategory() async {
+    final name = _newCatCtrl.text.trim();
+    if (name.isEmpty) return;
+    await FirebaseFirestore.instance.collection('categories').add({
+      'name': name,
+    });
+    _newCatCtrl.clear();
+    _msg("تم إضافة قسم: $name ✅");
+  }
+
+  void _editCategory(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    final ctrl = TextEditingController(text: data['name']?.toString() ?? "");
     showDialog(
-      context: ctx,
+      context: context,
       builder: (d) => AlertDialog(
         backgroundColor: CafeTheme.surface,
-        title: Text("حذف $type"),
-        content: Text("هل أنت متأكد من حذف هذا ال$type؟"),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          "تعديل القسم",
+          style: TextStyle(color: CafeTheme.primaryGold),
+        ),
+        content: _inputField(ctrl, "اسم القسم"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(d),
-            child: const Text("إلغاء"),
+            child: const Text("إلغاء", style: TextStyle(color: Colors.white38)),
           ),
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: CafeTheme.primaryGold,
+            ),
             onPressed: () {
-              ref.delete();
+              if (ctrl.text.trim().isEmpty) return;
+              doc.reference.update({'name': ctrl.text.trim()});
               Navigator.pop(d);
+              _msg("تم تحديث اسم القسم ✅");
             },
-            child: const Text("حذف", style: TextStyle(color: Colors.red)),
+            child: const Text("حفظ", style: TextStyle(color: Colors.black)),
           ),
         ],
       ),
     );
   }
 
-  Widget _card(String t, List<Widget> c) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: CafeTheme.surface,
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Column(
+  void _confirmDeleteCategory(DocumentSnapshot doc, String name) {
+    showDialog(
+      context: context,
+      builder: (d) => AlertDialog(
+        backgroundColor: CafeTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_rounded, color: CafeTheme.accentRed),
+            SizedBox(width: 8),
+            Text("حذف قسم"),
+          ],
+        ),
+        content: Text(
+          "هل تريد حذف قسم «$name»؟\nلن يتم حذف أصناف القسم.",
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(d),
+            child: const Text("إلغاء"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: CafeTheme.accentRed,
+            ),
+            onPressed: () {
+              doc.reference.delete();
+              Navigator.pop(d);
+              _msg("تم حذف القسم");
+            },
+            child: const Text("حذف", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductsTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          t,
-          style: const TextStyle(
-            color: CafeTheme.primaryGold,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+        _quickAddCard(),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: CafeTheme.surface,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: TextField(
+                  controller: _searchCtrl,
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(
+                      Icons.search,
+                      color: CafeTheme.primaryGold,
+                    ),
+                    hintText: "بحث...",
+                    hintStyle: TextStyle(color: Colors.white38),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('categories')
+                  .snapshots(),
+              builder: (_, snap) {
+                final cats = [
+                  'الكل',
+                  ...?snap.data?.docs.map(
+                    (d) => (d.data() as Map?)?['name']?.toString() ?? "",
+                  ),
+                ];
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: CafeTheme.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: CafeTheme.primaryGold.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedCatFilter ?? 'الكل',
+                      dropdownColor: CafeTheme.cardBg,
+                      style: const TextStyle(color: Colors.white),
+                      icon: const Icon(
+                        Icons.filter_list,
+                        color: CafeTheme.primaryGold,
+                        size: 18,
+                      ),
+                      items: cats
+                          .map(
+                            (c) => DropdownMenuItem(value: c, child: Text(c)),
+                          )
+                          .toList(),
+                      onChanged: (v) => setState(
+                        () => _selectedCatFilter = v == 'الكل' ? null : v,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance.collection('products').snapshots(),
+          builder: (ctx, snap) {
+            if (!snap.hasData) {
+              return const Center(
+                child: CircularProgressIndicator(color: CafeTheme.primaryGold),
+              );
+            }
+
+            var docs = snap.data!.docs.where((d) {
+              final data = d.data() as Map<String, dynamic>? ?? {};
+              final name = data['name']?.toString().toLowerCase() ?? "";
+              final cat = data['cat']?.toString() ?? "";
+              final matchSearch = name.contains(_searchQuery.toLowerCase());
+              final matchCat =
+                  _selectedCatFilter == null || cat == _selectedCatFilter;
+              return matchSearch && matchCat;
+            }).toList();
+
+            if (docs.isEmpty) {
+              return _emptyState(
+                Icons.fastfood_rounded,
+                "لا توجد أصناف\nأضف صنفك الأول من الأعلى!",
+              );
+            }
+
+            return ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: docs.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (_, i) => _productCard(docs[i]),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _quickAddCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: CafeTheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: CafeTheme.primaryGold.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.add_shopping_cart,
+                color: CafeTheme.primaryGold,
+                size: 20,
+              ),
+              SizedBox(width: 8),
+              Text(
+                "إضافة صنف سريع",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: _inputField(
+                  _quickNameCtrl,
+                  "اسم الصنف (أو اسم1، اسم2، ...)",
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 1,
+                child: _inputField(_quickPriceCtrl, "السعر", isNumber: true),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('categories')
+                .snapshots(),
+            builder: (_, snap) {
+              final cats =
+                  snap.data?.docs
+                      .map((d) => (d.data() as Map?)?['name']?.toString() ?? "")
+                      .toList() ??
+                  [];
+              if (cats.isEmpty) {
+                return const Text(
+                  "⚠️ أضف قسماً أولاً من تبويب الأقسام",
+                  style: TextStyle(color: CafeTheme.accentOrange, fontSize: 12),
+                );
+              }
+              if (!cats.contains(_quickCat)) _quickCat = cats.first;
+              return Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: CafeTheme.cardBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white12),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _quickCat,
+                          dropdownColor: CafeTheme.cardBg,
+                          style: const TextStyle(color: Colors.white),
+                          isExpanded: true,
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down,
+                            color: CafeTheme.primaryGold,
+                          ),
+                          items: cats
+                              .map(
+                                (c) =>
+                                    DropdownMenuItem(value: c, child: Text(c)),
+                              )
+                              .toList(),
+                          onChanged: (v) => setState(() => _quickCat = v),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton.icon(
+                    onPressed: _quickAddProduct,
+                    icon: const Icon(Icons.rocket_launch_rounded, size: 16),
+                    label: const Text("أضف"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: CafeTheme.primaryGold,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 13,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            "💡 يمكنك إضافة أكثر من صنف دفعة واحدة: بيبسي، كولا، ماء",
+            style: TextStyle(color: Colors.white38, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _quickAddProduct() async {
+    final rawNames = _quickNameCtrl.text.trim();
+    final cat = _quickCat;
+    if (rawNames.isEmpty || cat == null) {
+      _msg("أدخل اسم الصنف والقسم", isError: true);
+      return;
+    }
+    double price = double.tryParse(_quickPriceCtrl.text.trim()) ?? 0.0;
+
+    final names = rawNames
+        .split(RegExp(r'[،,\-]'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    for (final name in names) {
+      await FirebaseFirestore.instance.collection('products').add({
+        'name': name,
+        'cat': cat,
+        'price': price,
+        'image_url': "",
+        'has_sizes': false,
+      });
+    }
+    _quickNameCtrl.clear();
+    _quickPriceCtrl.clear();
+    _msg("تم إضافة ${names.length} ${names.length == 1 ? 'صنف' : 'أصناف'} ✅");
+  }
+
+  Widget _productCard(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    final name = data['name']?.toString() ?? "بدون اسم";
+    final cat = data['cat']?.toString() ?? "بدون قسم";
+    final price = data['price'] ?? 0;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: CafeTheme.cardBg,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        leading: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: CafeTheme.accentOrange.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Icon(
+            Icons.fastfood_rounded,
+            color: CafeTheme.accentOrange,
+            size: 20,
           ),
         ),
-        const SizedBox(height: 15),
-        ...c,
+        title: Text(
+          name,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Row(
+          children: [
+            _chip(cat, CafeTheme.primaryGold),
+            const SizedBox(width: 8),
+            _chip("$price ج.م", CafeTheme.accentGreen),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _iconBtn(
+              Icons.edit_rounded,
+              Colors.blueAccent,
+              () => _editProduct(doc),
+            ),
+            const SizedBox(width: 4),
+            _iconBtn(
+              Icons.delete_rounded,
+              CafeTheme.accentRed,
+              () => _confirmDeleteProduct(doc, name),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _editProduct(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    final nameCtrl = TextEditingController(
+      text: data['name']?.toString() ?? "",
+    );
+    final priceCtrl = TextEditingController(
+      text: (data['price'] ?? 0).toString(),
+    );
+    String editCat = data['cat']?.toString() ?? "";
+
+    showDialog(
+      context: context,
+      builder: (d) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          backgroundColor: CafeTheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.edit_rounded, color: CafeTheme.primaryGold),
+              SizedBox(width: 8),
+              Text("تعديل الصنف"),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _inputField(nameCtrl, "اسم الصنف"),
+                const SizedBox(height: 10),
+                _inputField(priceCtrl, "السعر", isNumber: true),
+                const SizedBox(height: 10),
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('categories')
+                      .snapshots(),
+                  builder: (_, snap) {
+                    final cats =
+                        snap.data?.docs
+                            .map(
+                              (d) =>
+                                  (d.data() as Map?)?['name']?.toString() ?? "",
+                            )
+                            .toList() ??
+                        [];
+                    if (!cats.contains(editCat) && cats.isNotEmpty) {
+                      editCat = cats.first;
+                    }
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: CafeTheme.cardBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white12),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: editCat.isEmpty ? null : editCat,
+                          isExpanded: true,
+                          dropdownColor: CafeTheme.cardBg,
+                          style: const TextStyle(color: Colors.white),
+                          hint: const Text(
+                            "اختر القسم",
+                            style: TextStyle(color: Colors.white54),
+                          ),
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down,
+                            color: CafeTheme.primaryGold,
+                          ),
+                          items: cats
+                              .map(
+                                (c) =>
+                                    DropdownMenuItem(value: c, child: Text(c)),
+                              )
+                              .toList(),
+                          onChanged: (v) => setSt(() => editCat = v ?? editCat),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(d),
+              child: const Text(
+                "إلغاء",
+                style: TextStyle(color: Colors.white38),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: CafeTheme.primaryGold,
+              ),
+              onPressed: () {
+                doc.reference.update({
+                  'name': nameCtrl.text.trim(),
+                  'price': double.tryParse(priceCtrl.text.trim()) ?? 0.0,
+                  'cat': editCat,
+                });
+                Navigator.pop(d);
+                _msg("تم تحديث الصنف ✅");
+              },
+              child: const Text("حفظ", style: TextStyle(color: Colors.black)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteProduct(DocumentSnapshot doc, String name) {
+    showDialog(
+      context: context,
+      builder: (d) => AlertDialog(
+        backgroundColor: CafeTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_rounded, color: CafeTheme.accentRed),
+            SizedBox(width: 8),
+            Text("حذف صنف"),
+          ],
+        ),
+        content: Text(
+          "هل تريد حذف «$name»؟",
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(d),
+            child: const Text("إلغاء"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: CafeTheme.accentRed,
+            ),
+            onPressed: () {
+              doc.reference.delete();
+              Navigator.pop(d);
+              _msg("تم حذف الصنف");
+            },
+            child: const Text("حذف", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBotTab() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: CafeTheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: CafeTheme.primaryGold.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.smart_toy_rounded, color: CafeTheme.primaryGold),
+              SizedBox(width: 8),
+              Text(
+                "بوت المنيو الذكي",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            "اكتب أمر بالعربي وهيتنفذ تلقائياً",
+            style: TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _botCtrl,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: "مثال: ضيف بيبسي وكولا في قسم المشروبات بسعر 20",
+              hintStyle: const TextStyle(color: Colors.white38),
+              filled: true,
+              fillColor: CafeTheme.cardBg,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              suffixIcon: IconButton(
+                icon: const Icon(
+                  Icons.send_rounded,
+                  color: CafeTheme.primaryGold,
+                ),
+                onPressed: _handleBotCommand,
+              ),
+            ),
+            onSubmitted: (_) => _handleBotCommand(),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            "أمثلة:",
+            style: TextStyle(
+              color: Colors.white54,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 6),
+          ...[
+            "انشئ قسم الوجبات السريعة",
+            "ضيف برجر في قسم الوجبات بسعر 50",
+            "ضيف صنف بيبسي وكولا في قسم المشروبات بسعر 15",
+          ].map(
+            (e) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: GestureDetector(
+                onTap: () => setState(() => _botCtrl.text = e),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: CafeTheme.cardBg,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.touch_app_rounded,
+                        color: CafeTheme.primaryGold,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          e,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleBotCommand() async {
+    String txt = _botCtrl.text.trim();
+    if (txt.isEmpty) return;
+
+    if (txt.contains("انشئ قسم") || txt.contains("أنشئ قسم")) {
+      String catName = txt.replaceAll(RegExp(r"انشئ قسم|أنشئ قسم"), "").trim();
+      if (catName.isNotEmpty) {
+        await FirebaseFirestore.instance.collection('categories').add({
+          'name': catName,
+        });
+        _msg("تم إنشاء القسم: $catName ✅");
+      }
+    } else {
+      try {
+        String catPart = "";
+        if (txt.contains("فى قسم"))
+          catPart = txt.split("فى قسم")[1].trim();
+        else if (txt.contains("في قسم"))
+          catPart = txt.split("في قسم")[1].trim();
+        else if (txt.contains("قسم"))
+          catPart = txt.split("قسم")[1].trim();
+
+        String pricePart = "";
+        if (txt.contains("بسعر"))
+          pricePart = txt.split("بسعر")[1].trim();
+        else if (txt.contains("سعر"))
+          pricePart = txt.split("سعر")[1].trim();
+
+        String finalCat = catPart.split(RegExp(r"بسعر|سعر"))[0].trim();
+        double finalPrice =
+            double.tryParse(pricePart.replaceAll(RegExp(r"[^0-9.]"), "")) ??
+            0.0;
+
+        String itemsPart = "";
+        if (txt.contains("صنف"))
+          itemsPart = txt
+              .split("صنف")[1]
+              .split(RegExp(r"فى قسم|في قسم|قسم"))[0]
+              .trim();
+        else
+          itemsPart = txt
+              .split(RegExp(r"فى قسم|في قسم|قسم"))[0]
+              .replaceAll(RegExp(r"اضف|أضف|ضيف"), "")
+              .trim();
+
+        List<String> items = itemsPart
+            .split(RegExp(r"[-،و,]"))
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+
+        if (items.isEmpty || finalCat.isEmpty) throw Exception();
+
+        for (var itemName in items) {
+          await FirebaseFirestore.instance.collection('products').add({
+            'name': itemName,
+            'cat': finalCat,
+            'price': finalPrice,
+            'image_url': "",
+            'has_sizes': false,
+          });
+        }
+        _msg("تم إضافة ${items.length} أصناف إلى قسم $finalCat 🚀");
+      } catch (e) {
+        _msg(
+          "لم أفهم الطلب، حاول: ضيف [اسم] في قسم [الاسم] بسعر [الرقم]",
+          isError: true,
+        );
+      }
+    }
+    _botCtrl.clear();
+  }
+
+  Widget _inputField(
+    TextEditingController ctrl,
+    String hint, {
+    bool isNumber = false,
+  }) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: isNumber
+          ? const TextInputType.numberWithOptions(decimal: true)
+          : TextInputType.text,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+        filled: true,
+        fillColor: CafeTheme.cardBg,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 13,
+        ),
+      ),
+    );
+  }
+
+  Widget _iconBtn(IconData icon, Color color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: color, size: 18),
+      ),
+    );
+  }
+
+  Widget _chip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
+  Widget _emptyState(IconData icon, String text) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 50),
+        child: Column(
+          children: [
+            Icon(icon, color: Colors.white12, size: 60),
+            const SizedBox(height: 16),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white38, fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: CafeTheme.surface,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: TabBar(
+            controller: _tabController,
+            indicator: BoxDecoration(
+              color: CafeTheme.primaryGold,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            labelColor: Colors.black,
+            unselectedLabelColor: Colors.white54,
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+            dividerColor: Colors.transparent,
+            padding: const EdgeInsets.all(4),
+            tabs: const [
+              Tab(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.folder_rounded, size: 16),
+                    SizedBox(width: 6),
+                    Text("الأقسام"),
+                  ],
+                ),
+              ),
+              Tab(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.fastfood_rounded, size: 16),
+                    SizedBox(width: 6),
+                    Text("الأصناف"),
+                  ],
+                ),
+              ),
+              Tab(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.smart_toy_rounded, size: 16),
+                    SizedBox(width: 6),
+                    Text("البوت"),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          height: 950,
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              SingleChildScrollView(child: _buildCategoriesTab()),
+              SingleChildScrollView(child: _buildProductsTab()),
+              SingleChildScrollView(child: _buildBotTab()),
+            ],
+          ),
+        ),
       ],
-    ),
-  );
+    );
+  }
 }
+
